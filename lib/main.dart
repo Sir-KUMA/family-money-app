@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'models/app_state.dart';
 import 'screens/home_screen.dart';
 import 'screens/jobs_screen.dart';
 import 'screens/money_screen.dart';
@@ -6,7 +8,12 @@ import 'screens/bucket_list_screen.dart';
 import 'screens/parent_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AppState(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

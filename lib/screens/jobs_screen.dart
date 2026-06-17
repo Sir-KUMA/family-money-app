@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/app_state.dart';
 
 class JobsScreen extends StatelessWidget {
   const JobsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('お仕事'),
@@ -13,17 +17,21 @@ class JobsScreen extends StatelessWidget {
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
-        children: const [
-          _SectionHeader('完了待ち'),
-          _JobCard(title: 'お皿洗い', reward: 50, status: JobStatus.pending),
-          _JobCard(title: 'ゴミ捨て', reward: 30, status: JobStatus.pending),
-          SizedBox(height: 16),
-          _SectionHeader('承認待ち'),
-          _JobCard(title: '部屋の掃除', reward: 100, status: JobStatus.waitingApproval),
-          SizedBox(height: 16),
-          _SectionHeader('完了済み'),
-          _JobCard(title: '洗濯物をたたむ', reward: 50, status: JobStatus.done),
-          _JobCard(title: '犬の散歩', reward: 80, status: JobStatus.done),
+        children: [
+          if (state.pendingJobs.isNotEmpty) ...[
+            const _SectionHeader('完了待ち'),
+            ...state.pendingJobs.map((job) => _JobCard(job: job)),
+            const SizedBox(height: 16),
+          ],
+          if (state.waitingJobs.isNotEmpty) ...[
+            const _SectionHeader('チェック待ち'),
+            ...state.waitingJobs.map((job) => _JobCard(job: job)),
+            const SizedBox(height: 16),
+          ],
+          if (state.doneJobs.isNotEmpty) ...[
+            const _SectionHeader('完了済み'),
+            ...state.doneJobs.map((job) => _JobCard(job: job)),
+          ],
         ],
       ),
     );
@@ -43,20 +51,17 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-enum JobStatus { pending, waitingApproval, done }
-
 class _JobCard extends StatelessWidget {
-  final String title;
-  final int reward;
-  final JobStatus status;
-
-  const _JobCard({required this.title, required this.reward, required this.status});
+  final Job job;
+  const _JobCard({required this.job});
 
   @override
   Widget build(BuildContext context) {
-    final statusConfig = switch (status) {
-      JobStatus.pending => (label: '完了報告する', color: const Color(0xFF4CAF50), icon: Icons.check_circle_outline),
-      JobStatus.waitingApproval => (label: '承認待ち', color: Colors.orange, icon: Icons.hourglass_empty),
+    final state = context.read<AppState>();
+
+    final statusConfig = switch (job.status) {
+      JobStatus.pending => (label: 'できた！', color: const Color(0xFF4CAF50), icon: Icons.check_circle_outline),
+      JobStatus.waitingApproval => (label: 'チェック待ち', color: Colors.orange, icon: Icons.hourglass_empty),
       JobStatus.done => (label: '完了', color: Colors.grey, icon: Icons.check_circle),
     };
 
@@ -72,14 +77,14 @@ class _JobCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('報酬: ¥$reward', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                  Text(job.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text('報酬: ¥${job.reward}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
                 ],
               ),
             ),
-            if (status == JobStatus.pending)
+            if (job.status == JobStatus.pending)
               TextButton(
-                onPressed: () {},
+                onPressed: () => state.reportDone(job),
                 style: TextButton.styleFrom(foregroundColor: statusConfig.color),
                 child: Text(statusConfig.label),
               )

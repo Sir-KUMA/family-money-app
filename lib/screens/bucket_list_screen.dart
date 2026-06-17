@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/app_state.dart';
+import '../utils/format.dart';
 
 class BucketListScreen extends StatelessWidget {
   const BucketListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('ほしいものリスト'),
@@ -13,14 +18,16 @@ class BucketListScreen extends StatelessWidget {
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
-        children: const [
-          _BucketItem(name: 'レゴ スターウォーズ', price: 8000, currentAssets: 12500, emoji: '🧱'),
-          SizedBox(height: 12),
-          _BucketItem(name: 'Nintendo Switch2', price: 6000, currentAssets: 12500, emoji: '🎮'),
-          SizedBox(height: 12),
-          _BucketItem(name: '図鑑 恐竜', price: 2200, currentAssets: 12500, emoji: '📚'),
-          SizedBox(height: 12),
-          _BucketItem(name: '自転車', price: 30000, currentAssets: 12500, emoji: '🚲'),
+        children: [
+          for (final item in state.bucketItems) ...[
+            _BucketItemCard(
+              item: item,
+              currentAssets: state.totalAssets,
+              isRequested: state.isRequested(item),
+              isPurchased: state.isPurchased(item),
+            ),
+            const SizedBox(height: 12),
+          ],
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -33,19 +40,24 @@ class BucketListScreen extends StatelessWidget {
   }
 }
 
-class _BucketItem extends StatelessWidget {
-  final String name;
-  final int price;
+class _BucketItemCard extends StatelessWidget {
+  final BucketItem item;
   final int currentAssets;
-  final String emoji;
+  final bool isRequested;
+  final bool isPurchased;
 
-  const _BucketItem({required this.name, required this.price, required this.currentAssets, required this.emoji});
+  const _BucketItemCard({
+    required this.item,
+    required this.currentAssets,
+    required this.isRequested,
+    required this.isPurchased,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final progress = (currentAssets / price).clamp(0.0, 1.0);
-    final canBuy = currentAssets >= price;
-    final remaining = price - currentAssets;
+    final progress = (currentAssets / item.price).clamp(0.0, 1.0);
+    final canBuy = currentAssets >= item.price;
+    final remaining = item.price - currentAssets;
 
     return Card(
       child: Padding(
@@ -55,62 +67,103 @@ class _BucketItem extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(emoji, style: const TextStyle(fontSize: 28)),
+                Text(item.emoji, style: const TextStyle(fontSize: 28)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      Text('¥${_formatPrice(price)}', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                      Text(item.name,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('¥${formatYen(item.price)}',
+                          style: const TextStyle(fontSize: 14, color: Colors.grey)),
                     ],
                   ),
                 ),
-                if (canBuy)
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
-                    child: const Text('購入申請'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.grey[200],
-              color: canBuy ? const Color(0xFF4CAF50) : Colors.blue,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  canBuy ? '🎉 購入できます！' : 'あと ¥${_formatPrice(remaining)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: canBuy ? const Color(0xFF4CAF50) : Colors.grey,
-                    fontWeight: canBuy ? FontWeight.bold : FontWeight.normal,
-                  ),
+                _ActionButton(
+                  item: item,
+                  canBuy: canBuy,
+                  isRequested: isRequested,
+                  isPurchased: isPurchased,
                 ),
-                Text('${(progress * 100).toStringAsFixed(0)}%', style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
+            if (!isPurchased) ...[
+              const SizedBox(height: 12),
+              LinearProgressIndicator(
+                value: progress,
+                backgroundColor: Colors.grey[200],
+                color: canBuy ? const Color(0xFF4CAF50) : Colors.blue,
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    canBuy ? '🎉 購入できます！' : 'あと ¥${formatYen(remaining)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: canBuy ? const Color(0xFF4CAF50) : Colors.grey,
+                      fontWeight: canBuy ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  Text('${(progress * 100).toStringAsFixed(0)}%',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
 
-  String _formatPrice(int price) {
-    return price.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]},',
-    );
+class _ActionButton extends StatelessWidget {
+  final BucketItem item;
+  final bool canBuy;
+  final bool isRequested;
+  final bool isPurchased;
+
+  const _ActionButton({
+    required this.item,
+    required this.canBuy,
+    required this.isRequested,
+    required this.isPurchased,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isPurchased) {
+      return const Chip(
+        label: Text('購入済み', style: TextStyle(fontSize: 12)),
+        backgroundColor: Color(0xFFE8F5E9),
+        labelStyle: TextStyle(color: Color(0xFF4CAF50)),
+      );
+    }
+
+    if (isRequested) {
+      return const Chip(
+        label: Text('申請中', style: TextStyle(fontSize: 12)),
+        backgroundColor: Color(0xFFFFF3E0),
+        labelStyle: TextStyle(color: Colors.orange),
+      );
+    }
+
+    if (canBuy) {
+      return ElevatedButton(
+        onPressed: () => context.read<AppState>().requestPurchase(item),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF4CAF50),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        child: const Text('購入申請'),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
