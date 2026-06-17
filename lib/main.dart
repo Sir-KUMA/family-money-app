@@ -3,6 +3,7 @@ import 'screens/home_screen.dart';
 import 'screens/jobs_screen.dart';
 import 'screens/money_screen.dart';
 import 'screens/bucket_list_screen.dart';
+import 'screens/parent_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -39,6 +40,7 @@ class _MainScreenState extends State<MainScreen> {
     JobsScreen(),
     MoneyScreen(),
     BucketListScreen(),
+    ParentScreen(),
   ];
 
   @override
@@ -56,6 +58,7 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.work), label: 'お仕事'),
           BottomNavigationBarItem(icon: Icon(Icons.account_balance), label: 'お金'),
           BottomNavigationBarItem(icon: Icon(Icons.star), label: 'ほしいもの'),
+          BottomNavigationBarItem(icon: Icon(Icons.supervisor_account), label: '親'),
         ],
       ),
     );
