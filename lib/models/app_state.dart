@@ -50,12 +50,26 @@ class BucketItem {
   final int price;
   final String emoji;
 
-  const BucketItem({
+  BucketItem({
     required this.id,
     required this.name,
     required this.price,
     required this.emoji,
   });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'price': price,
+        'emoji': emoji,
+      };
+
+  factory BucketItem.fromJson(Map<String, dynamic> json) => BucketItem(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        price: json['price'] as int,
+        emoji: json['emoji'] as String,
+      );
 }
 
 class AppState extends ChangeNotifier {
@@ -69,7 +83,7 @@ class AppState extends ChangeNotifier {
     Stock(name: 'TOPIX', description: '日本の会社をたくさん集めたチーム', invested: 0, current: 0),
   ];
 
-  final List<BucketItem> bucketItems = const [
+  List<BucketItem> bucketItems = [
     BucketItem(id: '1', name: 'レゴ スターウォーズ', price: 8000, emoji: '🧱'),
     BucketItem(id: '2', name: 'Nintendo Switch2', price: 6000, emoji: '🎮'),
     BucketItem(id: '3', name: '図鑑 恐竜', price: 2200, emoji: '📚'),
@@ -124,6 +138,12 @@ class AppState extends ChangeNotifier {
     if (purchasedJson != null) {
       _purchasedItemIds.addAll((jsonDecode(purchasedJson) as List).cast<String>());
     }
+
+    final bucketJson = prefs.getString('bucketItems');
+    if (bucketJson != null) {
+      final list = jsonDecode(bucketJson) as List;
+      bucketItems = list.map((e) => BucketItem.fromJson(e as Map<String, dynamic>)).toList();
+    }
   }
 
   Future<void> _save() async {
@@ -133,6 +153,7 @@ class AppState extends ChangeNotifier {
     await prefs.setString('jobs', jsonEncode(jobs.map((j) => j.toJson()).toList()));
     await prefs.setString('requestedItemIds', jsonEncode(_requestedItemIds.toList()));
     await prefs.setString('purchasedItemIds', jsonEncode(_purchasedItemIds.toList()));
+    await prefs.setString('bucketItems', jsonEncode(bucketItems.map((b) => b.toJson()).toList()));
   }
 
   // ── お仕事操作 ───────────────────────────────────────────────
@@ -166,6 +187,23 @@ class AppState extends ChangeNotifier {
 
   void rejectJob(Job job) {
     job.status = JobStatus.pending;
+    notifyListeners();
+    _save();
+  }
+
+  // ── ほしいものリスト操作 ─────────────────────────────────────
+
+  void addBucketItem(String name, int price, String emoji) {
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    bucketItems.add(BucketItem(id: id, name: name, price: price, emoji: emoji));
+    notifyListeners();
+    _save();
+  }
+
+  void deleteBucketItem(BucketItem item) {
+    bucketItems.remove(item);
+    _requestedItemIds.remove(item.id);
+    _purchasedItemIds.remove(item.id);
     notifyListeners();
     _save();
   }
