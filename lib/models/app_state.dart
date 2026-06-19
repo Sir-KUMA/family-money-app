@@ -28,12 +28,14 @@ class Job {
 }
 
 class Stock {
+  final String id;
   final String name;
   final String description;
-  final int invested;
-  final int current;
+  int invested;
+  int current;
 
-  const Stock({
+  Stock({
+    required this.id,
     required this.name,
     required this.description,
     required this.invested,
@@ -42,6 +44,22 @@ class Stock {
 
   int get gain => current - invested;
   double get gainPercent => invested == 0 ? 0 : gain / invested * 100;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'description': description,
+        'invested': invested,
+        'current': current,
+      };
+
+  factory Stock.fromJson(Map<String, dynamic> json) => Stock(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        description: json['description'] as String,
+        invested: json['invested'] as int,
+        current: json['current'] as int,
+      );
 }
 
 class BucketItem {
@@ -76,11 +94,11 @@ class AppState extends ChangeNotifier {
   int bankBalance = 7500;
   int principal = 10000;
 
-  final List<Stock> stocks = const [
-    Stock(name: 'S&P500', description: 'アメリカの大きな会社500社のチーム', invested: 2750, current: 3000),
-    Stock(name: 'NASDAQ100', description: 'アメリカのすごい会社たちのチーム', invested: 1850, current: 2000),
-    Stock(name: '日経225', description: '日本の有名な会社225社のチーム', invested: 0, current: 0),
-    Stock(name: 'TOPIX', description: '日本の会社をたくさん集めたチーム', invested: 0, current: 0),
+  List<Stock> stocks = [
+    Stock(id: 'sp500', name: 'S&P500', description: 'アメリカの大きな会社500社のチーム', invested: 2750, current: 3000),
+    Stock(id: 'nasdaq100', name: 'NASDAQ100', description: 'アメリカのすごい会社たちのチーム', invested: 1850, current: 2000),
+    Stock(id: 'nikkei225', name: '日経225', description: '日本の有名な会社225社のチーム', invested: 0, current: 0),
+    Stock(id: 'topix', name: 'TOPIX', description: '日本の会社をたくさん集めたチーム', invested: 0, current: 0),
   ];
 
   List<BucketItem> bucketItems = [
@@ -144,6 +162,12 @@ class AppState extends ChangeNotifier {
       final list = jsonDecode(bucketJson) as List;
       bucketItems = list.map((e) => BucketItem.fromJson(e as Map<String, dynamic>)).toList();
     }
+
+    final stocksJson = prefs.getString('stocks');
+    if (stocksJson != null) {
+      final list = jsonDecode(stocksJson) as List;
+      stocks = list.map((e) => Stock.fromJson(e as Map<String, dynamic>)).toList();
+    }
   }
 
   Future<void> _save() async {
@@ -154,6 +178,7 @@ class AppState extends ChangeNotifier {
     await prefs.setString('requestedItemIds', jsonEncode(_requestedItemIds.toList()));
     await prefs.setString('purchasedItemIds', jsonEncode(_purchasedItemIds.toList()));
     await prefs.setString('bucketItems', jsonEncode(bucketItems.map((b) => b.toJson()).toList()));
+    await prefs.setString('stocks', jsonEncode(stocks.map((s) => s.toJson()).toList()));
   }
 
   // ── お仕事操作 ───────────────────────────────────────────────
@@ -187,6 +212,19 @@ class AppState extends ChangeNotifier {
 
   void rejectJob(Job job) {
     job.status = JobStatus.pending;
+    notifyListeners();
+    _save();
+  }
+
+  // ── 投資操作 ────────────────────────────────────────────────
+
+  bool canInvest(int amount) => amount > 0 && bankBalance >= amount;
+
+  void invest(Stock stock, int amount) {
+    if (!canInvest(amount)) return;
+    bankBalance -= amount;
+    stock.invested += amount;
+    stock.current += amount;
     notifyListeners();
     _save();
   }

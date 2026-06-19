@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/app_state.dart';
 import '../utils/format.dart';
@@ -11,25 +10,6 @@ const _presetEmojis = [
   '👟', '🎀', '🌈', '🐶', '🐱', '🦖',
 ];
 
-class _ThousandsSeparatorFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final digits = newValue.text.replaceAll(',', '');
-    if (digits.isEmpty) return newValue.copyWith(text: '');
-    if (int.tryParse(digits) == null) return oldValue;
-
-    final buffer = StringBuffer();
-    for (int i = 0; i < digits.length; i++) {
-      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
-      buffer.write(digits[i]);
-    }
-    final formatted = buffer.toString();
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-}
 
 class BucketListScreen extends StatelessWidget {
   const BucketListScreen({super.key});
@@ -274,7 +254,7 @@ class _AddBucketItemDialogState extends State<_AddBucketItemDialog> {
               controller: _priceController,
               decoration: const InputDecoration(labelText: '値段（円）', hintText: '例: 3,000'),
               keyboardType: TextInputType.number,
-              inputFormatters: [_ThousandsSeparatorFormatter()],
+              inputFormatters: [ThousandsSeparatorFormatter()],
             ),
             const SizedBox(height: 16),
             const Text('絵文字', style: TextStyle(fontSize: 13, color: Colors.grey)),

@@ -57,9 +57,9 @@ class _BankCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('残高', style: TextStyle(fontSize: 14)),
+                const Text('残高', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
                 Text('¥${formatYen(balance)}',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue)),
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue)),
               ],
             ),
             const SizedBox(height: 8),
@@ -112,34 +112,39 @@ class _StocksCard extends StatelessWidget {
             const Text('世界の会社に投資できるよ。増えることも減ることもある。',
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const Divider(height: 24),
+            const Text('合計', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _StockStat(label: '元本', value: '¥${formatYen(totalInvested)}'),
+                const SizedBox(width: 16),
+                _StockStat(
+                  label: '含み益',
+                  value: totalInvested == 0
+                      ? '—'
+                      : '${totalGain >= 0 ? '+' : ''}¥${formatYen(totalGain)}',
+                  sub: totalInvested == 0 ? null : '(${totalGainPercent.toStringAsFixed(1)}%)',
+                  valueColor: totalInvested == 0
+                      ? Colors.grey
+                      : (totalGain >= 0 ? const Color(0xFF4CAF50) : Colors.red),
+                ),
+                const Spacer(),
+                _StockStat(
+                  label: '評価額',
+                  value: '¥${formatYen(total)}',
+                  align: CrossAxisAlignment.end,
+                  valueBold: true,
+                  valueColor: Colors.orange,
+                ),
+              ],
+            ),
+            const Divider(height: 24),
             ...stocks.map((s) => Column(
                   children: [
                     _StockRow(stock: s),
                     if (s != stocks.last) const Divider(),
                   ],
                 )),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('合計評価額', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                Text('¥${formatYen(total)}',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.orange)),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('評価損益', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                Text(
-                  '${totalGain >= 0 ? '+' : ''}¥${formatYen(totalGain)} (${totalGainPercent.toStringAsFixed(1)}%)',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: totalGain >= 0 ? const Color(0xFF4CAF50) : Colors.red,
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -156,28 +161,57 @@ class _StockRow extends StatelessWidget {
     final gainColor = stock.gain >= 0 ? const Color(0xFF4CAF50) : Colors.red;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(stock.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                Text(stock.description, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              Text('¥${formatYen(stock.current)}',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              if (stock.invested > 0)
-                Text(
-                  '${stock.gain >= 0 ? '+' : ''}¥${formatYen(stock.gain)} (${stock.gainPercent.toStringAsFixed(1)}%)',
-                  style: TextStyle(fontSize: 12, color: gainColor),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(stock.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text(stock.description, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  ],
                 ),
+              ),
+              TextButton(
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (_) => _InvestDialog(stock: stock),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.orange.shade50,
+                  foregroundColor: Colors.orange,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('投資する', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _StockStat(label: '元本', value: '¥${formatYen(stock.invested)}'),
+              const SizedBox(width: 16),
+              _StockStat(
+                label: '含み益',
+                value: stock.invested == 0
+                    ? '—'
+                    : '${stock.gain >= 0 ? '+' : ''}¥${formatYen(stock.gain)}',
+                sub: stock.invested == 0 ? null : '(${stock.gainPercent.toStringAsFixed(1)}%)',
+                valueColor: stock.invested == 0 ? Colors.grey : gainColor,
+              ),
+              const Spacer(),
+              _StockStat(
+                label: '評価額',
+                value: '¥${formatYen(stock.current)}',
+                align: CrossAxisAlignment.end,
+                valueBold: true,
+              ),
             ],
           ),
         ],
@@ -185,3 +219,127 @@ class _StockRow extends StatelessWidget {
     );
   }
 }
+
+class _StockStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? sub;
+  final Color? valueColor;
+  final CrossAxisAlignment align;
+  final bool valueBold;
+
+  const _StockStat({
+    required this.label,
+    required this.value,
+    this.sub,
+    this.valueColor,
+    this.align = CrossAxisAlignment.start,
+    this.valueBold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: align,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+        Row(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: valueBold ? 20 : 13,
+                fontWeight: valueBold ? FontWeight.bold : FontWeight.normal,
+                color: valueColor,
+              ),
+            ),
+            if (sub != null) ...[
+              const SizedBox(width: 2),
+              Text(sub!, style: TextStyle(fontSize: 11, color: valueColor)),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _InvestDialog extends StatefulWidget {
+  final Stock stock;
+  const _InvestDialog({required this.stock});
+
+  @override
+  State<_InvestDialog> createState() => _InvestDialogState();
+}
+
+class _InvestDialogState extends State<_InvestDialog> {
+  final _amountController = TextEditingController();
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final amount = int.tryParse(_amountController.text.replaceAll(',', ''));
+    if (amount == null || amount <= 0) return;
+
+    final state = context.read<AppState>();
+    if (!state.canInvest(amount)) return;
+
+    state.invest(widget.stock, amount);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final amount = int.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
+    final canInvest = state.canInvest(amount);
+
+    return AlertDialog(
+      title: Text('${widget.stock.name} に投資'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('銀行残高: ¥${formatYen(state.bankBalance)}',
+              style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _amountController,
+            decoration: const InputDecoration(
+              labelText: '投資する金額（円）',
+              hintText: '例: 1,000',
+            ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorFormatter()],
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _submit(),
+          ),
+          if (amount > 0 && !canInvest) ...[
+            const SizedBox(height: 8),
+            const Text('残高が不足しています', style: TextStyle(fontSize: 12, color: Colors.red)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
+        ),
+        ElevatedButton(
+          onPressed: canInvest ? _submit : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('投資する'),
+        ),
+      ],
+    );
+  }
+}
+
