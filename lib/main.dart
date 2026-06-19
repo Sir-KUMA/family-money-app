@@ -8,10 +8,14 @@ import 'screens/money_screen.dart';
 import 'screens/bucket_list_screen.dart';
 import 'screens/parent_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final appState = AppState();
+  await appState.load();
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppState(),
+    ChangeNotifierProvider.value(
+      value: appState,
       child: const MyApp(),
     ),
   );

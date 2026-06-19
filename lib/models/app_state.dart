@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum JobStatus { pending, waitingApproval, done }
 
@@ -85,9 +87,54 @@ class AppState extends ChangeNotifier {
   List<Job> get waitingJobs => jobs.where((j) => j.status == JobStatus.waitingApproval).toList();
   List<Job> get doneJobs => jobs.where((j) => j.status == JobStatus.done).toList();
 
+  // ── 保存・読み込み ──────────────────────────────────────────
+
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    bankBalance = prefs.getInt('bankBalance') ?? 7500;
+    principal = prefs.getInt('principal') ?? 10000;
+
+    final jobStatusesJson = prefs.getString('jobStatuses');
+    if (jobStatusesJson != null) {
+      final map = jsonDecode(jobStatusesJson) as Map<String, dynamic>;
+      for (final job in jobs) {
+        final statusStr = map[job.id] as String?;
+        if (statusStr != null) {
+          job.status = JobStatus.values.firstWhere((s) => s.name == statusStr);
+        }
+      }
+    }
+
+    final requestedJson = prefs.getString('requestedItemIds');
+    if (requestedJson != null) {
+      _requestedItemIds.addAll((jsonDecode(requestedJson) as List).cast<String>());
+    }
+
+    final purchasedJson = prefs.getString('purchasedItemIds');
+    if (purchasedJson != null) {
+      _purchasedItemIds.addAll((jsonDecode(purchasedJson) as List).cast<String>());
+    }
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('bankBalance', bankBalance);
+    await prefs.setInt('principal', principal);
+    await prefs.setString(
+      'jobStatuses',
+      jsonEncode({for (final j in jobs) j.id: j.status.name}),
+    );
+    await prefs.setString('requestedItemIds', jsonEncode(_requestedItemIds.toList()));
+    await prefs.setString('purchasedItemIds', jsonEncode(_purchasedItemIds.toList()));
+  }
+
+  // ── 操作メソッド ────────────────────────────────────────────
+
   void reportDone(Job job) {
     job.status = JobStatus.waitingApproval;
     notifyListeners();
+    _save();
   }
 
   void approveJob(Job job) {
@@ -95,16 +142,19 @@ class AppState extends ChangeNotifier {
     bankBalance += job.reward;
     principal += job.reward;
     notifyListeners();
+    _save();
   }
 
   void rejectJob(Job job) {
     job.status = JobStatus.pending;
     notifyListeners();
+    _save();
   }
 
   void requestPurchase(BucketItem item) {
     _requestedItemIds.add(item.id);
     notifyListeners();
+    _save();
   }
 
   bool canApprovePurchase(BucketItem item) => bankBalance >= item.price;
@@ -115,10 +165,12 @@ class AppState extends ChangeNotifier {
     _purchasedItemIds.add(item.id);
     bankBalance -= item.price;
     notifyListeners();
+    _save();
   }
 
   void rejectPurchase(BucketItem item) {
     _requestedItemIds.remove(item.id);
     notifyListeners();
+    _save();
   }
 }
