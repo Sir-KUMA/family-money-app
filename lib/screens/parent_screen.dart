@@ -23,6 +23,8 @@ class ParentScreen extends StatelessWidget {
             SizedBox(height: 24),
             _PurchaseRequestSection(),
             SizedBox(height: 24),
+            _JobManagementSection(),
+            SizedBox(height: 24),
             _ChildrenAssetsSection(),
             SizedBox(height: 24),
             _FundsSection(),
@@ -264,6 +266,189 @@ class _PurchaseRequestCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _JobManagementSection extends StatelessWidget {
+  const _JobManagementSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('お仕事管理', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => const _AddJobDialog(),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('追加'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (state.jobs.isEmpty)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('お仕事がありません', style: TextStyle(color: Colors.grey)),
+            ),
+          )
+        else
+          ...state.jobs.map((job) => _JobManagementCard(job: job)),
+      ],
+    );
+  }
+}
+
+class _JobManagementCard extends StatelessWidget {
+  final Job job;
+  const _JobManagementCard({required this.job});
+
+  @override
+  Widget build(BuildContext context) {
+    final statusLabel = switch (job.status) {
+      JobStatus.pending => '未完了',
+      JobStatus.waitingApproval => 'チェック待ち',
+      JobStatus.done => '完了',
+    };
+    final statusColor = switch (job.status) {
+      JobStatus.pending => Colors.grey,
+      JobStatus.waitingApproval => Colors.orange,
+      JobStatus.done => const Color(0xFF4CAF50),
+    };
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(job.title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text('¥${job.reward}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(statusLabel, style: TextStyle(fontSize: 11, color: statusColor)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('お仕事を削除'),
+                  content: Text('「${job.title}」を削除しますか？'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('キャンセル'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        context.read<AppState>().deleteJob(job);
+                        Navigator.of(context).pop();
+                      },
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      child: const Text('削除'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AddJobDialog extends StatefulWidget {
+  const _AddJobDialog();
+
+  @override
+  State<_AddJobDialog> createState() => _AddJobDialogState();
+}
+
+class _AddJobDialogState extends State<_AddJobDialog> {
+  final _titleController = TextEditingController();
+  final _rewardController = TextEditingController();
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _rewardController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final title = _titleController.text.trim();
+    final reward = int.tryParse(_rewardController.text.trim());
+    if (title.isEmpty || reward == null || reward <= 0) return;
+
+    context.read<AppState>().addJob(title, reward);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('お仕事を追加'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _titleController,
+            decoration: const InputDecoration(labelText: 'お仕事の名前', hintText: '例: お皿洗い'),
+            autofocus: true,
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _rewardController,
+            decoration: const InputDecoration(labelText: '報酬（円）', hintText: '例: 50'),
+            keyboardType: TextInputType.number,
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
+        ),
+        ElevatedButton(
+          onPressed: _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4CAF50),
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('追加'),
+        ),
+      ],
     );
   }
 }

@@ -11,6 +11,20 @@ class Job {
   JobStatus status;
 
   Job({required this.id, required this.title, required this.reward, required this.status});
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'reward': reward,
+        'status': status.name,
+      };
+
+  factory Job.fromJson(Map<String, dynamic> json) => Job(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        reward: json['reward'] as int,
+        status: JobStatus.values.firstWhere((s) => s.name == json['status']),
+      );
 }
 
 class Stock {
@@ -62,7 +76,7 @@ class AppState extends ChangeNotifier {
     BucketItem(id: '4', name: '自転車', price: 30000, emoji: '🚲'),
   ];
 
-  final List<Job> jobs = [
+  List<Job> jobs = [
     Job(id: '1', title: 'お皿洗い', reward: 50, status: JobStatus.pending),
     Job(id: '2', title: 'ゴミ捨て', reward: 30, status: JobStatus.pending),
     Job(id: '3', title: '部屋の掃除', reward: 100, status: JobStatus.waitingApproval),
@@ -95,15 +109,10 @@ class AppState extends ChangeNotifier {
     bankBalance = prefs.getInt('bankBalance') ?? 7500;
     principal = prefs.getInt('principal') ?? 10000;
 
-    final jobStatusesJson = prefs.getString('jobStatuses');
-    if (jobStatusesJson != null) {
-      final map = jsonDecode(jobStatusesJson) as Map<String, dynamic>;
-      for (final job in jobs) {
-        final statusStr = map[job.id] as String?;
-        if (statusStr != null) {
-          job.status = JobStatus.values.firstWhere((s) => s.name == statusStr);
-        }
-      }
+    final jobsJson = prefs.getString('jobs');
+    if (jobsJson != null) {
+      final list = jsonDecode(jobsJson) as List;
+      jobs = list.map((e) => Job.fromJson(e as Map<String, dynamic>)).toList();
     }
 
     final requestedJson = prefs.getString('requestedItemIds');
@@ -121,15 +130,25 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('bankBalance', bankBalance);
     await prefs.setInt('principal', principal);
-    await prefs.setString(
-      'jobStatuses',
-      jsonEncode({for (final j in jobs) j.id: j.status.name}),
-    );
+    await prefs.setString('jobs', jsonEncode(jobs.map((j) => j.toJson()).toList()));
     await prefs.setString('requestedItemIds', jsonEncode(_requestedItemIds.toList()));
     await prefs.setString('purchasedItemIds', jsonEncode(_purchasedItemIds.toList()));
   }
 
-  // ── 操作メソッド ────────────────────────────────────────────
+  // ── お仕事操作 ───────────────────────────────────────────────
+
+  void addJob(String title, int reward) {
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    jobs.add(Job(id: id, title: title, reward: reward, status: JobStatus.pending));
+    notifyListeners();
+    _save();
+  }
+
+  void deleteJob(Job job) {
+    jobs.remove(job);
+    notifyListeners();
+    _save();
+  }
 
   void reportDone(Job job) {
     job.status = JobStatus.waitingApproval;
@@ -150,6 +169,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     _save();
   }
+
+  // ── 購入申請操作 ─────────────────────────────────────────────
 
   void requestPurchase(BucketItem item) {
     _requestedItemIds.add(item.id);
