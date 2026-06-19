@@ -83,9 +83,14 @@ class _JobCard extends StatelessWidget {
               ),
             ),
             if (job.status == JobStatus.pending)
-              TextButton(
+              ElevatedButton(
                 onPressed: () => state.reportDone(job),
-                style: TextButton.styleFrom(foregroundColor: statusConfig.color),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: statusConfig.color,
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
                 child: Text(statusConfig.label),
               )
             else
