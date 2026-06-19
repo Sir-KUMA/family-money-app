@@ -303,7 +303,8 @@ class _JobManagementSection extends StatelessWidget {
             ),
           )
         else
-          ...state.jobs.map((job) => _JobManagementCard(job: job)),
+          ...[...state.doneJobs, ...state.waitingJobs, ...state.pendingJobs]
+              .map((job) => _JobManagementCard(job: job)),
       ],
     );
   }
@@ -355,6 +356,12 @@ class _JobManagementCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (job.status != JobStatus.pending)
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.blue),
+                tooltip: '未完了に戻す',
+                onPressed: () => context.read<AppState>().rejectJob(job),
+              ),
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               onPressed: () => showDialog(
