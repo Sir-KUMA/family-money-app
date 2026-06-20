@@ -4,37 +4,110 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/app_state.dart';
 import '../utils/format.dart';
 
-class ParentScreen extends StatelessWidget {
+class ParentScreen extends StatefulWidget {
   const ParentScreen({super.key});
+
+  @override
+  State<ParentScreen> createState() => _ParentScreenState();
+}
+
+class _ParentScreenState extends State<ParentScreen> {
+  int _index = 0;
+
+  static const _tabs = [
+    (icon: Icons.check_circle_outline, label: '承認'),
+    (icon: Icons.update, label: '月次更新'),
+    (icon: Icons.star_outline, label: 'ファンド'),
+    (icon: Icons.settings_outlined, label: '管理'),
+  ];
+
+  static const _pages = [
+    _ApprovalPage(),
+    _MonthlyUpdatePage(),
+    _FundPage(),
+    _ManagementPage(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('親画面'),
-        backgroundColor: const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
+      body: _pages[_index],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _index,
+        selectedItemColor: const Color(0xFF1565C0),
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        onTap: (i) => setState(() => _index = i),
+        items: _tabs
+            .map((t) => BottomNavigationBarItem(
+                  icon: Icon(t.icon),
+                  label: t.label,
+                ))
+            .toList(),
       ),
-      body: const SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ChildManagementSection(),
-            SizedBox(height: 24),
-            _ApprovalSection(),
-            SizedBox(height: 24),
-            _PurchaseRequestSection(),
-            SizedBox(height: 24),
-            _MonthlyUpdateSection(),
-            SizedBox(height: 24),
-            _CustomFundManagementSection(),
-            SizedBox(height: 24),
-            _JobManagementSection(),
-            SizedBox(height: 24),
-            _ChildrenAssetsSection(),
-          ],
-        ),
+    );
+  }
+}
+
+class _ApprovalPage extends StatelessWidget {
+  const _ApprovalPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ApprovalSection(),
+          SizedBox(height: 24),
+          _PurchaseRequestSection(),
+        ],
+      ),
+    );
+  }
+}
+
+class _MonthlyUpdatePage extends StatelessWidget {
+  const _MonthlyUpdatePage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: _MonthlyUpdateSection(),
+    );
+  }
+}
+
+class _FundPage extends StatelessWidget {
+  const _FundPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: _CustomFundManagementSection(),
+    );
+  }
+}
+
+class _ManagementPage extends StatelessWidget {
+  const _ManagementPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ChildManagementSection(),
+          SizedBox(height: 24),
+          _JobManagementSection(),
+          SizedBox(height: 24),
+          _ChildrenAssetsSection(),
+        ],
       ),
     );
   }
