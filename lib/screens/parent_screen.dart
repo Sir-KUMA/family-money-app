@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/app_state.dart';
 import '../utils/format.dart';
 
@@ -429,6 +430,13 @@ class _MonthlyUpdateDialogState extends State<_MonthlyUpdateDialog> {
     'topix': 'TOPIX',
   };
 
+  static const _urls = {
+    'sp500': 'https://finance.yahoo.com/quote/%5EGSPC/',
+    'nasdaq100': 'https://finance.yahoo.com/quote/%5ENDX/',
+    'nikkei225': 'https://finance.yahoo.com/quote/%5EN225/',
+    'topix': 'https://finance.yahoo.com/quote/%5ETPX/',
+  };
+
   @override
   void dispose() {
     for (final c in _controllers.values) {
@@ -463,15 +471,33 @@ class _MonthlyUpdateDialogState extends State<_MonthlyUpdateDialog> {
             const SizedBox(height: 12),
             ..._labels.entries.map((entry) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: TextField(
-                    controller: _controllers[entry.key],
-                    decoration: InputDecoration(
-                      labelText: entry.value,
-                      suffixText: '%',
-                      hintText: '0.0',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                        signed: true, decimal: true),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _controllers[entry.key],
+                          decoration: InputDecoration(
+                            labelText: entry.value,
+                            suffixText: '%',
+                            hintText: '0.0',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              signed: true, decimal: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        tooltip: '${entry.value}を調べる',
+                        color: Colors.blue,
+                        onPressed: () async {
+                          final url = Uri.parse(_urls[entry.key]!);
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 )),
             const Divider(),
