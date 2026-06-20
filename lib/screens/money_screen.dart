@@ -20,9 +20,13 @@ class MoneyScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _BankCard(balance: state.bankBalance),
+            _BankCard(balance: state.bankBalance, annualInterestPercent: state.bankAnnualInterestPercent),
             const SizedBox(height: 16),
             _StocksCard(stocks: state.stocks, total: state.stocksValue),
+            if (state.customFunds.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _CustomFundsCard(funds: state.customFunds),
+            ],
           ],
         ),
       ),
@@ -32,11 +36,12 @@ class MoneyScreen extends StatelessWidget {
 
 class _BankCard extends StatelessWidget {
   final int balance;
-  const _BankCard({required this.balance});
+  final double annualInterestPercent;
+  const _BankCard({required this.balance, required this.annualInterestPercent});
 
   @override
   Widget build(BuildContext context) {
-    final monthlyInterest = (balance * 0.01 / 12).round();
+    final monthlyInterest = (balance * annualInterestPercent / 100 / 12).round();
 
     return Card(
       child: Padding(
@@ -63,11 +68,11 @@ class _BankCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('金利（年率）', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                Text('1.0%', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                const Text('金利（年率）', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                Text('${annualInterestPercent.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 13, color: Colors.grey)),
               ],
             ),
             Row(
@@ -258,6 +263,221 @@ class _StockStat extends StatelessWidget {
               Text(sub!, style: TextStyle(fontSize: 11, color: valueColor)),
             ],
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _CustomFundsCard extends StatelessWidget {
+  final List<CustomFund> funds;
+  const _CustomFundsCard({required this.funds});
+
+  @override
+  Widget build(BuildContext context) {
+    final totalInvested = funds.fold(0, (sum, f) => sum + f.invested);
+    final totalCurrent = funds.fold(0, (sum, f) => sum + f.current);
+    final totalGain = totalCurrent - totalInvested;
+    final totalGainPercent = totalInvested == 0 ? 0.0 : totalGain / totalInvested * 100;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.star, color: Colors.purple),
+                SizedBox(width: 8),
+                Text('親ファンド', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text('パパ・ママが作った特別なファンド！',
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Divider(height: 24),
+            const Text('合計', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.purple)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _StockStat(label: '元本', value: '¥${formatYen(totalInvested)}'),
+                const SizedBox(width: 16),
+                _StockStat(
+                  label: '含み益',
+                  value: totalInvested == 0
+                      ? '—'
+                      : '${totalGain >= 0 ? '+' : ''}¥${formatYen(totalGain)}',
+                  sub: totalInvested == 0 ? null : '(${totalGainPercent.toStringAsFixed(1)}%)',
+                  valueColor: totalInvested == 0
+                      ? Colors.grey
+                      : (totalGain >= 0 ? const Color(0xFF4CAF50) : Colors.red),
+                ),
+                const Spacer(),
+                _StockStat(
+                  label: '評価額',
+                  value: '¥${formatYen(totalCurrent)}',
+                  align: CrossAxisAlignment.end,
+                  valueBold: true,
+                  valueColor: Colors.purple,
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            ...funds.map((f) => Column(
+                  children: [
+                    _CustomFundRow(fund: f),
+                    if (f != funds.last) const Divider(),
+                  ],
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomFundRow extends StatelessWidget {
+  final CustomFund fund;
+  const _CustomFundRow({required this.fund});
+
+  @override
+  Widget build(BuildContext context) {
+    final gainColor = fund.gain >= 0 ? const Color(0xFF4CAF50) : Colors.red;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(fund.emoji, style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(fund.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text(fund.description, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (_) => _CustomFundInvestDialog(fund: fund),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.purple.shade50,
+                  foregroundColor: Colors.purple,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('投資する', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _StockStat(label: '元本', value: '¥${formatYen(fund.invested)}'),
+              const SizedBox(width: 16),
+              _StockStat(
+                label: '含み益',
+                value: fund.invested == 0
+                    ? '—'
+                    : '${fund.gain >= 0 ? '+' : ''}¥${formatYen(fund.gain)}',
+                sub: fund.invested == 0 ? null : '(${fund.gainPercent.toStringAsFixed(1)}%)',
+                valueColor: fund.invested == 0 ? Colors.grey : gainColor,
+              ),
+              const Spacer(),
+              _StockStat(
+                label: '評価額',
+                value: '¥${formatYen(fund.current)}',
+                align: CrossAxisAlignment.end,
+                valueBold: true,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomFundInvestDialog extends StatefulWidget {
+  final CustomFund fund;
+  const _CustomFundInvestDialog({required this.fund});
+
+  @override
+  State<_CustomFundInvestDialog> createState() => _CustomFundInvestDialogState();
+}
+
+class _CustomFundInvestDialogState extends State<_CustomFundInvestDialog> {
+  final _amountController = TextEditingController();
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final amount = int.tryParse(_amountController.text.replaceAll(',', ''));
+    if (amount == null || amount <= 0) return;
+    final state = context.read<AppState>();
+    if (!state.canInvest(amount)) return;
+    state.investInCustomFund(widget.fund, amount);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final amount = int.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
+    final canInvest = state.canInvest(amount);
+
+    return AlertDialog(
+      title: Text('${widget.fund.emoji} ${widget.fund.name} に投資'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('銀行残高: ¥${formatYen(state.bankBalance)}',
+              style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _amountController,
+            decoration: const InputDecoration(
+              labelText: '投資する金額（円）',
+              hintText: '例: 1,000',
+            ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorFormatter()],
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _submit(),
+          ),
+          if (amount > 0 && !canInvest) ...[
+            const SizedBox(height: 8),
+            const Text('残高が不足しています', style: TextStyle(fontSize: 12, color: Colors.red)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
+        ),
+        ElevatedButton(
+          onPressed: canInvest ? _submit : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.purple,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('投資する'),
         ),
       ],
     );

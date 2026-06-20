@@ -62,6 +62,68 @@ class Stock {
       );
 }
 
+class CustomFund {
+  final String id;
+  String name;
+  String emoji;
+  String? baseStockId;
+  double multiplier;
+  double bonusMonthlyPercent;
+  int invested;
+  int current;
+
+  CustomFund({
+    required this.id,
+    required this.name,
+    required this.emoji,
+    this.baseStockId,
+    required this.multiplier,
+    required this.bonusMonthlyPercent,
+    required this.invested,
+    required this.current,
+  });
+
+  int get gain => current - invested;
+  double get gainPercent => invested == 0 ? 0 : gain / invested * 100;
+
+  String get description {
+    final parts = <String>[];
+    if (baseStockId != null) {
+      const names = {
+        'sp500': 'S&P500', 'nasdaq100': 'NASDAQ100',
+        'nikkei225': '日経225', 'topix': 'TOPIX',
+      };
+      parts.add('${names[baseStockId]} × $multiplier倍');
+    }
+    if (bonusMonthlyPercent > 0) {
+      parts.add('+${bonusMonthlyPercent.toStringAsFixed(0)}%/月');
+    }
+    return parts.isEmpty ? 'カスタムファンド' : parts.join('、');
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'emoji': emoji,
+        'baseStockId': baseStockId,
+        'multiplier': multiplier,
+        'bonusMonthlyPercent': bonusMonthlyPercent,
+        'invested': invested,
+        'current': current,
+      };
+
+  factory CustomFund.fromJson(Map<String, dynamic> json) => CustomFund(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        emoji: json['emoji'] as String,
+        baseStockId: json['baseStockId'] as String?,
+        multiplier: (json['multiplier'] as num).toDouble(),
+        bonusMonthlyPercent: (json['bonusMonthlyPercent'] as num).toDouble(),
+        invested: json['invested'] as int,
+        current: json['current'] as int,
+      );
+}
+
 class BucketItem {
   final String id;
   final String name;
@@ -93,6 +155,7 @@ class BucketItem {
 class AppState extends ChangeNotifier {
   int bankBalance = 7500;
   int principal = 10000;
+  double bankAnnualInterestPercent = 1.0;
 
   List<Stock> stocks = [
     Stock(id: 'sp500', name: 'S&P500', description: 'アメリカの大きな会社500社のチーム', invested: 2750, current: 3000),
@@ -100,6 +163,8 @@ class AppState extends ChangeNotifier {
     Stock(id: 'nikkei225', name: '日経225', description: '日本の有名な会社225社のチーム', invested: 0, current: 0),
     Stock(id: 'topix', name: 'TOPIX', description: '日本の会社をたくさん集めたチーム', invested: 0, current: 0),
   ];
+
+  List<CustomFund> customFunds = [];
 
   List<BucketItem> bucketItems = [
     BucketItem(id: '1', name: 'レゴ スターウォーズ', price: 8000, emoji: '🧱'),
@@ -126,7 +191,8 @@ class AppState extends ChangeNotifier {
       bucketItems.where((item) => _requestedItemIds.contains(item.id)).toList();
 
   int get stocksValue => stocks.fold(0, (sum, s) => sum + s.current);
-  int get totalAssets => bankBalance + stocksValue;
+  int get customFundsValue => customFunds.fold(0, (sum, f) => sum + f.current);
+  int get totalAssets => bankBalance + stocksValue + customFundsValue;
   int get gainLoss => totalAssets - principal;
 
   List<Job> get pendingJobs => jobs.where((j) => j.status == JobStatus.pending).toList();
@@ -140,11 +206,27 @@ class AppState extends ChangeNotifier {
 
     bankBalance = prefs.getInt('bankBalance') ?? 7500;
     principal = prefs.getInt('principal') ?? 10000;
+    bankAnnualInterestPercent = prefs.getDouble('bankAnnualInterestPercent') ?? 1.0;
 
     final jobsJson = prefs.getString('jobs');
     if (jobsJson != null) {
-      final list = jsonDecode(jobsJson) as List;
-      jobs = list.map((e) => Job.fromJson(e as Map<String, dynamic>)).toList();
+      jobs = (jsonDecode(jobsJson) as List)
+          .map((e) => Job.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
+    final stocksJson = prefs.getString('stocks');
+    if (stocksJson != null) {
+      stocks = (jsonDecode(stocksJson) as List)
+          .map((e) => Stock.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
+    final customFundsJson = prefs.getString('customFunds');
+    if (customFundsJson != null) {
+      customFunds = (jsonDecode(customFundsJson) as List)
+          .map((e) => CustomFund.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
 
     final requestedJson = prefs.getString('requestedItemIds');
@@ -159,14 +241,9 @@ class AppState extends ChangeNotifier {
 
     final bucketJson = prefs.getString('bucketItems');
     if (bucketJson != null) {
-      final list = jsonDecode(bucketJson) as List;
-      bucketItems = list.map((e) => BucketItem.fromJson(e as Map<String, dynamic>)).toList();
-    }
-
-    final stocksJson = prefs.getString('stocks');
-    if (stocksJson != null) {
-      final list = jsonDecode(stocksJson) as List;
-      stocks = list.map((e) => Stock.fromJson(e as Map<String, dynamic>)).toList();
+      bucketItems = (jsonDecode(bucketJson) as List)
+          .map((e) => BucketItem.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
   }
 
@@ -174,11 +251,13 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('bankBalance', bankBalance);
     await prefs.setInt('principal', principal);
+    await prefs.setDouble('bankAnnualInterestPercent', bankAnnualInterestPercent);
     await prefs.setString('jobs', jsonEncode(jobs.map((j) => j.toJson()).toList()));
+    await prefs.setString('stocks', jsonEncode(stocks.map((s) => s.toJson()).toList()));
+    await prefs.setString('customFunds', jsonEncode(customFunds.map((f) => f.toJson()).toList()));
     await prefs.setString('requestedItemIds', jsonEncode(_requestedItemIds.toList()));
     await prefs.setString('purchasedItemIds', jsonEncode(_purchasedItemIds.toList()));
     await prefs.setString('bucketItems', jsonEncode(bucketItems.map((b) => b.toJson()).toList()));
-    await prefs.setString('stocks', jsonEncode(stocks.map((s) => s.toJson()).toList()));
   }
 
   // ── お仕事操作 ───────────────────────────────────────────────
@@ -225,6 +304,81 @@ class AppState extends ChangeNotifier {
     bankBalance -= amount;
     stock.invested += amount;
     stock.current += amount;
+    notifyListeners();
+    _save();
+  }
+
+  void investInCustomFund(CustomFund fund, int amount) {
+    if (!canInvest(amount)) return;
+    bankBalance -= amount;
+    fund.invested += amount;
+    fund.current += amount;
+    notifyListeners();
+    _save();
+  }
+
+  // ── 親ファンド・利率操作 ─────────────────────────────────────
+
+  void setBankInterestRate(double percent) {
+    bankAnnualInterestPercent = percent;
+    notifyListeners();
+    _save();
+  }
+
+  void addCustomFund({
+    required String name,
+    required String emoji,
+    String? baseStockId,
+    required double multiplier,
+    required double bonusMonthlyPercent,
+  }) {
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    customFunds.add(CustomFund(
+      id: id,
+      name: name,
+      emoji: emoji,
+      baseStockId: baseStockId,
+      multiplier: multiplier,
+      bonusMonthlyPercent: bonusMonthlyPercent,
+      invested: 0,
+      current: 0,
+    ));
+    notifyListeners();
+    _save();
+  }
+
+  void deleteCustomFund(CustomFund fund) {
+    customFunds.remove(fund);
+    notifyListeners();
+    _save();
+  }
+
+  // indexMonthlyReturns: 各指数の今月のリターン（例: {'sp500': 0.023} = +2.3%）
+  void applyMonthlyReturns(Map<String, double> indexMonthlyReturns) {
+    // 通常の指数ファンドを更新
+    for (final stock in stocks) {
+      final ret = indexMonthlyReturns[stock.id] ?? 0.0;
+      if (ret != 0 && stock.current > 0) {
+        stock.current += (stock.current * ret).round();
+      }
+    }
+
+    // カスタムファンドを更新
+    for (final fund in customFunds) {
+      double monthlyReturn = fund.bonusMonthlyPercent / 100;
+      if (fund.baseStockId != null) {
+        final indexReturn = indexMonthlyReturns[fund.baseStockId] ?? 0.0;
+        monthlyReturn += indexReturn * fund.multiplier;
+      }
+      if (fund.current > 0) {
+        fund.current += (fund.current * monthlyReturn).round();
+      }
+    }
+
+    // 銀行利息を加算（利息は gainLoss に反映、principal は増やさない）
+    final interest = (bankBalance * bankAnnualInterestPercent / 100 / 12).round();
+    bankBalance += interest;
+
     notifyListeners();
     _save();
   }
