@@ -431,10 +431,10 @@ class _MonthlyUpdateDialogState extends State<_MonthlyUpdateDialog> {
   };
 
   static const _urls = {
-    'sp500': 'https://finance.yahoo.com/quote/%5EGSPC/',
-    'nasdaq100': 'https://finance.yahoo.com/quote/%5ENDX/',
-    'nikkei225': 'https://finance.yahoo.com/quote/%5EN225/',
-    'topix': 'https://finance.yahoo.com/quote/%5ETPX/',
+    'sp500': 'https://www.google.com/finance/quote/.INX:INDEXSP?hl=ja',
+    'nasdaq100': 'https://www.google.com/finance/quote/NDX:INDEXNASDAQ?hl=ja',
+    'nikkei225': 'https://www.google.com/finance/quote/NI225:INDEXNIKKEI?hl=ja',
+    'topix': 'https://www.google.com/finance/quote/TOPIX:INDEXJPX?hl=ja',
   };
 
   @override
@@ -468,6 +468,8 @@ class _MonthlyUpdateDialogState extends State<_MonthlyUpdateDialog> {
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const Text('例: +2.3 または -1.5',
                 style: TextStyle(fontSize: 11, color: Colors.grey)),
+            const Text('🔗 右のボタンでGoogle Financeを開き、「1M」を選ぶと月次騰落率が確認できます',
+                style: TextStyle(fontSize: 11, color: Colors.blue)),
             const SizedBox(height: 12),
             ..._labels.entries.map((entry) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
