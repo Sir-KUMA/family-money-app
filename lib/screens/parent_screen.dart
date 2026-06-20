@@ -17,14 +17,14 @@ class _ParentScreenState extends State<ParentScreen> {
   static const _tabs = [
     (icon: Icons.check_circle_outline, label: '承認'),
     (icon: Icons.update, label: '月次更新'),
-    (icon: Icons.star_outline, label: 'ファンド'),
+    (icon: Icons.work_outline, label: 'お仕事'),
     (icon: Icons.settings_outlined, label: '管理'),
   ];
 
   static const _pages = [
     _ApprovalPage(),
     _MonthlyUpdatePage(),
-    _FundPage(),
+    _JobPage(),
     _ManagementPage(),
   ];
 
@@ -75,19 +75,26 @@ class _MonthlyUpdatePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const SingleChildScrollView(
       padding: EdgeInsets.all(16),
-      child: _MonthlyUpdateSection(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _MonthlyUpdateSection(),
+          SizedBox(height: 24),
+          _CustomFundManagementSection(),
+        ],
+      ),
     );
   }
 }
 
-class _FundPage extends StatelessWidget {
-  const _FundPage();
+class _JobPage extends StatelessWidget {
+  const _JobPage();
 
   @override
   Widget build(BuildContext context) {
     return const SingleChildScrollView(
       padding: EdgeInsets.all(16),
-      child: _CustomFundManagementSection(),
+      child: _JobManagementSection(),
     );
   }
 }
@@ -99,24 +106,15 @@ class _ManagementPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const SingleChildScrollView(
       padding: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _ChildManagementSection(),
-          SizedBox(height: 24),
-          _JobManagementSection(),
-          SizedBox(height: 24),
-          _ChildrenAssetsSection(),
-        ],
-      ),
+      child: _ChildrenManagementSection(),
     );
   }
 }
 
-// ── 子ども管理セクション ──────────────────────────────────────
+// ── 子ども管理＋資産一覧（統合） ─────────────────────────────
 
-class _ChildManagementSection extends StatelessWidget {
-  const _ChildManagementSection();
+class _ChildrenManagementSection extends StatelessWidget {
+  const _ChildrenManagementSection();
 
   @override
   Widget build(BuildContext context) {
@@ -141,57 +139,113 @@ class _ChildManagementSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        ...state.children.map((child) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFE8F5E9),
-                  child: Icon(Icons.child_care, color: Color(0xFF4CAF50)),
-                ),
-                title: Text(child.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('総資産: ¥${formatYen(child.totalAssets)}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 20),
-                      onPressed: () => showDialog(
-                        context: context,
-                        builder: (_) => _RenameChildDialog(child: child),
+        ...state.children.map((child) {
+          final gain = child.gainLoss;
+          final gainColor = gain >= 0 ? const Color(0xFF4CAF50) : Colors.red;
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const CircleAvatar(
+                        backgroundColor: Color(0xFFE8F5E9),
+                        child: Icon(Icons.child_care, color: Color(0xFF4CAF50)),
                       ),
-                    ),
-                    if (state.children.length > 1)
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(child.name,
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline,
-                            color: Colors.red, size: 20),
+                        icon: const Icon(Icons.edit_outlined, size: 20),
                         onPressed: () => showDialog(
                           context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('子どもを削除'),
-                            content: Text('「${child.name}」のデータをすべて削除しますか？'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text('キャンセル'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  context.read<AppState>().deleteChild(child);
-                                  Navigator.of(context).pop();
-                                },
-                                style: TextButton.styleFrom(
-                                    foregroundColor: Colors.red),
-                                child: const Text('削除'),
-                              ),
-                            ],
-                          ),
+                          builder: (_) => _RenameChildDialog(child: child),
                         ),
                       ),
-                  ],
-                ),
+                      if (state.children.length > 1)
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.red, size: 20),
+                          onPressed: () => showDialog(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text('子どもを削除'),
+                              content:
+                                  Text('「${child.name}」のデータをすべて削除しますか？'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(),
+                                  child: const Text('キャンセル'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    context
+                                        .read<AppState>()
+                                        .deleteChild(child);
+                                    Navigator.of(context).pop();
+                                  },
+                                  style: TextButton.styleFrom(
+                                      foregroundColor: Colors.red),
+                                  child: const Text('削除'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const Divider(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('総資産',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey)),
+                            Text('¥${formatYen(child.totalAssets)}',
+                                style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold)),
+                            Text(
+                              '${gain >= 0 ? '+' : ''}¥${formatYen(gain)}',
+                              style:
+                                  TextStyle(fontSize: 12, color: gainColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('銀行 ¥${formatYen(child.bankBalance)}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey)),
+                          Text('証券 ¥${formatYen(child.stocksValue)}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey)),
+                          if (child.fundsValue > 0)
+                            Text('親ファンド ¥${formatYen(child.fundsValue)}',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.purple)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            )),
+            ),
+          );
+        }),
       ],
     );
   }
@@ -1261,66 +1315,3 @@ class _AddJobDialogState extends State<_AddJobDialog> {
   }
 }
 
-// ── 子どもの資産一覧 ─────────────────────────────────────────
-
-class _ChildrenAssetsSection extends StatelessWidget {
-  const _ChildrenAssetsSection();
-
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('子どもの資産一覧',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        ...state.children.map((child) {
-          final gain = child.gainLoss;
-          final gainColor = gain >= 0 ? const Color(0xFF4CAF50) : Colors.red;
-
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(child.name,
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold)),
-                      const Spacer(),
-                      Text('¥${formatYen(child.totalAssets)}',
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        '${gain >= 0 ? '+' : ''}¥${formatYen(gain)}',
-                        style: TextStyle(fontSize: 13, color: gainColor),
-                      ),
-                      const SizedBox(width: 12),
-                      Text('銀行 ¥${formatYen(child.bankBalance)}',
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.grey)),
-                      const SizedBox(width: 8),
-                      Text('証券 ¥${formatYen(child.stocksValue)}',
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.grey)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-}
