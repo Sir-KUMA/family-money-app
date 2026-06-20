@@ -3,37 +3,38 @@ import 'package:provider/provider.dart';
 import '../models/app_state.dart';
 
 class JobsScreen extends StatelessWidget {
-  const JobsScreen({super.key});
+  final String childId;
+  const JobsScreen({super.key, required this.childId});
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final child = state.childById(childId);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('お仕事'),
-        backgroundColor: const Color(0xFF4CAF50),
-        foregroundColor: Colors.white,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (state.pendingJobs.isNotEmpty) ...[
-            const _SectionHeader('完了待ち'),
-            ...state.pendingJobs.map((job) => _JobCard(job: job)),
-            const SizedBox(height: 16),
-          ],
-          if (state.waitingJobs.isNotEmpty) ...[
-            const _SectionHeader('チェック待ち'),
-            ...state.waitingJobs.map((job) => _JobCard(job: job)),
-            const SizedBox(height: 16),
-          ],
-          if (state.doneJobs.isNotEmpty) ...[
-            const _SectionHeader('完了済み'),
-            ...state.doneJobs.map((job) => _JobCard(job: job)),
-          ],
-        ],
-      ),
+      body: child.jobs.isEmpty
+          ? const Center(
+              child: Text('お仕事がありません', style: TextStyle(color: Colors.grey)),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (child.pendingJobs.isNotEmpty) ...[
+                  const _SectionHeader('完了待ち'),
+                  ...child.pendingJobs.map((job) => _JobCard(childId: childId, job: job)),
+                  const SizedBox(height: 16),
+                ],
+                if (child.waitingJobs.isNotEmpty) ...[
+                  const _SectionHeader('チェック待ち'),
+                  ...child.waitingJobs.map((job) => _JobCard(childId: childId, job: job)),
+                  const SizedBox(height: 16),
+                ],
+                if (child.doneJobs.isNotEmpty) ...[
+                  const _SectionHeader('完了済み'),
+                  ...child.doneJobs.map((job) => _JobCard(childId: childId, job: job)),
+                ],
+              ],
+            ),
     );
   }
 }
@@ -46,22 +47,28 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+      child: Text(title,
+          style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
     );
   }
 }
 
 class _JobCard extends StatelessWidget {
+  final String childId;
   final Job job;
-  const _JobCard({required this.job});
+  const _JobCard({required this.childId, required this.job});
 
   @override
   Widget build(BuildContext context) {
     final state = context.read<AppState>();
+    final child = state.childById(childId);
 
     final statusConfig = switch (job.status) {
-      JobStatus.pending => (label: 'できた！', color: const Color(0xFF4CAF50), icon: Icons.check_circle_outline),
-      JobStatus.waitingApproval => (label: 'チェック待ち', color: Colors.orange, icon: Icons.hourglass_empty),
+      JobStatus.pending =>
+        (label: 'できた！', color: const Color(0xFF4CAF50), icon: Icons.check_circle_outline),
+      JobStatus.waitingApproval =>
+        (label: 'チェック待ち', color: Colors.orange, icon: Icons.hourglass_empty),
       JobStatus.done => (label: '完了', color: Colors.grey, icon: Icons.check_circle),
     };
 
@@ -77,14 +84,16 @@ class _JobCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(job.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('報酬: ¥${job.reward}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                  Text(job.title,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text('報酬: ¥${job.reward}',
+                      style: const TextStyle(fontSize: 13, color: Colors.grey)),
                 ],
               ),
             ),
             if (job.status == JobStatus.pending)
               ElevatedButton(
-                onPressed: () => state.reportDone(job),
+                onPressed: () => state.reportDone(child, job),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: statusConfig.color,
                   foregroundColor: Colors.white,
@@ -94,7 +103,8 @@ class _JobCard extends StatelessWidget {
                 child: Text(statusConfig.label),
               )
             else
-              Text(statusConfig.label, style: TextStyle(color: statusConfig.color, fontSize: 13)),
+              Text(statusConfig.label,
+                  style: TextStyle(color: statusConfig.color, fontSize: 13)),
           ],
         ),
       ),

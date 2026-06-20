@@ -33,45 +33,93 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         textTheme: GoogleFonts.notoSansJpTextTheme(),
       ),
-      home: const MainScreen(),
+      home: const AppShell(),
     );
   }
 }
 
-class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
-
-  @override
-  State<MainScreen> createState() => _MainScreenState();
-}
-
-class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
-
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    JobsScreen(),
-    MoneyScreen(),
-    BucketListScreen(),
-    ParentScreen(),
-  ];
+class AppShell extends StatelessWidget {
+  const AppShell({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final tabCount = state.children.length + 1;
+
+    return DefaultTabController(
+      key: ValueKey(tabCount),
+      length: tabCount,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F5F5),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF4CAF50),
+          foregroundColor: Colors.white,
+          title: const Text('おこづかいアプリ'),
+          bottom: TabBar(
+            isScrollable: true,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
+            tabs: [
+              ...state.children.map((c) => Tab(
+                    icon: const Icon(Icons.child_care, size: 18),
+                    text: c.name,
+                  )),
+              const Tab(
+                icon: Icon(Icons.manage_accounts, size: 18),
+                text: '親',
+              ),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            ...state.children.map((c) => ChildShell(childId: c.id)),
+            const ParentScreen(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ChildShell extends StatefulWidget {
+  final String childId;
+  const ChildShell({super.key, required this.childId});
+
+  @override
+  State<ChildShell> createState() => _ChildShellState();
+}
+
+class _ChildShellState extends State<ChildShell> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final screens = [
+      HomeScreen(childId: widget.childId),
+      JobsScreen(childId: widget.childId),
+      MoneyScreen(childId: widget.childId),
+      BucketListScreen(childId: widget.childId),
+    ];
+
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: screens[_index],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
+        currentIndex: _index,
         selectedItemColor: const Color(0xFF4CAF50),
         unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        onTap: (i) => setState(() => _index = i),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'ホーム'),
-          BottomNavigationBarItem(icon: Icon(Icons.work), label: 'お仕事'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_balance), label: 'お金'),
-          BottomNavigationBarItem(icon: Icon(Icons.star), label: 'ほしいもの'),
-          BottomNavigationBarItem(icon: Icon(Icons.supervisor_account), label: '親'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.work_outline), label: 'お仕事'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              label: 'お金'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.star_outline), label: 'ほしいもの'),
         ],
       ),
     );

@@ -60,8 +60,16 @@ class Stock {
         invested: json['invested'] as int,
         current: json['current'] as int,
       );
+
+  static List<Stock> defaultList() => [
+        Stock(id: 'sp500', name: 'S&P500', description: 'アメリカの大きな会社500社のチーム', invested: 0, current: 0),
+        Stock(id: 'nasdaq100', name: 'NASDAQ100', description: 'アメリカのすごい会社たちのチーム', invested: 0, current: 0),
+        Stock(id: 'nikkei225', name: '日経225', description: '日本の有名な会社225社のチーム', invested: 0, current: 0),
+        Stock(id: 'topix', name: 'TOPIX', description: '日本の会社をたくさん集めたチーム', invested: 0, current: 0),
+      ];
 }
 
+// 親が作成するカスタムファンドの定義（子どもごとのポジションは ChildFundPosition で管理）
 class CustomFund {
   final String id;
   String name;
@@ -69,8 +77,6 @@ class CustomFund {
   String? baseStockId;
   double multiplier;
   double bonusMonthlyPercent;
-  int invested;
-  int current;
 
   CustomFund({
     required this.id,
@@ -79,19 +85,16 @@ class CustomFund {
     this.baseStockId,
     required this.multiplier,
     required this.bonusMonthlyPercent,
-    required this.invested,
-    required this.current,
   });
-
-  int get gain => current - invested;
-  double get gainPercent => invested == 0 ? 0 : gain / invested * 100;
 
   String get description {
     final parts = <String>[];
     if (baseStockId != null) {
       const names = {
-        'sp500': 'S&P500', 'nasdaq100': 'NASDAQ100',
-        'nikkei225': '日経225', 'topix': 'TOPIX',
+        'sp500': 'S&P500',
+        'nasdaq100': 'NASDAQ100',
+        'nikkei225': '日経225',
+        'topix': 'TOPIX',
       };
       parts.add('${names[baseStockId]} × $multiplier倍');
     }
@@ -108,8 +111,6 @@ class CustomFund {
         'baseStockId': baseStockId,
         'multiplier': multiplier,
         'bonusMonthlyPercent': bonusMonthlyPercent,
-        'invested': invested,
-        'current': current,
       };
 
   factory CustomFund.fromJson(Map<String, dynamic> json) => CustomFund(
@@ -119,8 +120,48 @@ class CustomFund {
         baseStockId: json['baseStockId'] as String?,
         multiplier: (json['multiplier'] as num).toDouble(),
         bonusMonthlyPercent: (json['bonusMonthlyPercent'] as num).toDouble(),
+      );
+}
+
+// 子どもごとのカスタムファンド投資ポジション
+class ChildFundPosition {
+  final String fundId;
+  int invested;
+  int current;
+
+  ChildFundPosition({required this.fundId, required this.invested, required this.current});
+
+  int get gain => current - invested;
+  double get gainPercent => invested == 0 ? 0 : gain / invested * 100;
+
+  Map<String, dynamic> toJson() => {
+        'fundId': fundId,
+        'invested': invested,
+        'current': current,
+      };
+
+  factory ChildFundPosition.fromJson(Map<String, dynamic> json) => ChildFundPosition(
+        fundId: json['fundId'] as String,
         invested: json['invested'] as int,
         current: json['current'] as int,
+      );
+}
+
+// 資産スナップショット（月次更新時に記録）
+class AssetSnapshot {
+  final DateTime date;
+  final int totalAssets;
+
+  AssetSnapshot({required this.date, required this.totalAssets});
+
+  Map<String, dynamic> toJson() => {
+        'date': date.toIso8601String(),
+        'totalAssets': totalAssets,
+      };
+
+  factory AssetSnapshot.fromJson(Map<String, dynamic> json) => AssetSnapshot(
+        date: DateTime.parse(json['date'] as String),
+        totalAssets: json['totalAssets'] as int,
       );
 }
 
@@ -130,19 +171,9 @@ class BucketItem {
   final int price;
   final String emoji;
 
-  BucketItem({
-    required this.id,
-    required this.name,
-    required this.price,
-    required this.emoji,
-  });
+  BucketItem({required this.id, required this.name, required this.price, required this.emoji});
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'price': price,
-        'emoji': emoji,
-      };
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'price': price, 'emoji': emoji};
 
   factory BucketItem.fromJson(Map<String, dynamic> json) => BucketItem(
         id: json['id'] as String,
@@ -152,172 +183,277 @@ class BucketItem {
       );
 }
 
-class AppState extends ChangeNotifier {
-  int bankBalance = 7500;
-  int principal = 10000;
-  double bankAnnualInterestPercent = 1.0;
+class Child {
+  final String id;
+  String name;
+  int bankBalance;
+  int principal;
+  List<Stock> stocks;
+  List<ChildFundPosition> fundPositions;
+  List<Job> jobs;
+  List<BucketItem> bucketItems;
+  final Set<String> requestedItemIds;
+  final Set<String> purchasedItemIds;
+  List<AssetSnapshot> assetHistory;
 
-  List<Stock> stocks = [
-    Stock(id: 'sp500', name: 'S&P500', description: 'アメリカの大きな会社500社のチーム', invested: 2750, current: 3000),
-    Stock(id: 'nasdaq100', name: 'NASDAQ100', description: 'アメリカのすごい会社たちのチーム', invested: 1850, current: 2000),
-    Stock(id: 'nikkei225', name: '日経225', description: '日本の有名な会社225社のチーム', invested: 0, current: 0),
-    Stock(id: 'topix', name: 'TOPIX', description: '日本の会社をたくさん集めたチーム', invested: 0, current: 0),
-  ];
-
-  List<CustomFund> customFunds = [];
-
-  List<BucketItem> bucketItems = [
-    BucketItem(id: '1', name: 'レゴ スターウォーズ', price: 8000, emoji: '🧱'),
-    BucketItem(id: '2', name: 'Nintendo Switch2', price: 6000, emoji: '🎮'),
-    BucketItem(id: '3', name: '図鑑 恐竜', price: 2200, emoji: '📚'),
-    BucketItem(id: '4', name: '自転車', price: 30000, emoji: '🚲'),
-  ];
-
-  List<Job> jobs = [
-    Job(id: '1', title: 'お皿洗い', reward: 50, status: JobStatus.pending),
-    Job(id: '2', title: 'ゴミ捨て', reward: 30, status: JobStatus.pending),
-    Job(id: '3', title: '部屋の掃除', reward: 100, status: JobStatus.waitingApproval),
-    Job(id: '4', title: '洗濯物をたたむ', reward: 50, status: JobStatus.done),
-    Job(id: '5', title: '犬の散歩', reward: 80, status: JobStatus.done),
-  ];
-
-  final Set<String> _requestedItemIds = {};
-  final Set<String> _purchasedItemIds = {};
-
-  bool isRequested(BucketItem item) => _requestedItemIds.contains(item.id);
-  bool isPurchased(BucketItem item) => _purchasedItemIds.contains(item.id);
-
-  List<BucketItem> get purchaseRequests =>
-      bucketItems.where((item) => _requestedItemIds.contains(item.id)).toList();
+  Child({
+    required this.id,
+    required this.name,
+    required this.bankBalance,
+    required this.principal,
+    required this.stocks,
+    List<ChildFundPosition>? fundPositions,
+    required this.jobs,
+    required this.bucketItems,
+    Set<String>? requestedItemIds,
+    Set<String>? purchasedItemIds,
+    List<AssetSnapshot>? assetHistory,
+  })  : fundPositions = fundPositions ?? [],
+        requestedItemIds = requestedItemIds ?? {},
+        purchasedItemIds = purchasedItemIds ?? {},
+        assetHistory = assetHistory ?? [];
 
   int get stocksValue => stocks.fold(0, (sum, s) => sum + s.current);
-  int get customFundsValue => customFunds.fold(0, (sum, f) => sum + f.current);
-  int get totalAssets => bankBalance + stocksValue + customFundsValue;
+  int get fundsValue => fundPositions.fold(0, (sum, p) => sum + p.current);
+  int get totalAssets => bankBalance + stocksValue + fundsValue;
   int get gainLoss => totalAssets - principal;
+
+  bool isRequested(BucketItem item) => requestedItemIds.contains(item.id);
+  bool isPurchased(BucketItem item) => purchasedItemIds.contains(item.id);
+
+  List<BucketItem> get purchaseRequests =>
+      bucketItems.where((item) => requestedItemIds.contains(item.id)).toList();
 
   List<Job> get pendingJobs => jobs.where((j) => j.status == JobStatus.pending).toList();
   List<Job> get waitingJobs => jobs.where((j) => j.status == JobStatus.waitingApproval).toList();
   List<Job> get doneJobs => jobs.where((j) => j.status == JobStatus.done).toList();
 
-  // ── 保存・読み込み ──────────────────────────────────────────
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'bankBalance': bankBalance,
+        'principal': principal,
+        'stocks': stocks.map((s) => s.toJson()).toList(),
+        'fundPositions': fundPositions.map((p) => p.toJson()).toList(),
+        'jobs': jobs.map((j) => j.toJson()).toList(),
+        'bucketItems': bucketItems.map((b) => b.toJson()).toList(),
+        'requestedItemIds': requestedItemIds.toList(),
+        'purchasedItemIds': purchasedItemIds.toList(),
+        'assetHistory': assetHistory.map((s) => s.toJson()).toList(),
+      };
 
-  Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
+  factory Child.fromJson(Map<String, dynamic> json) => Child(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        bankBalance: json['bankBalance'] as int,
+        principal: json['principal'] as int,
+        stocks: (json['stocks'] as List)
+            .map((e) => Stock.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        fundPositions: (json['fundPositions'] as List? ?? [])
+            .map((e) => ChildFundPosition.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        jobs: (json['jobs'] as List)
+            .map((e) => Job.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        bucketItems: (json['bucketItems'] as List)
+            .map((e) => BucketItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        requestedItemIds:
+            Set<String>.from((json['requestedItemIds'] as List? ?? []).cast<String>()),
+        purchasedItemIds:
+            Set<String>.from((json['purchasedItemIds'] as List? ?? []).cast<String>()),
+        assetHistory: (json['assetHistory'] as List? ?? [])
+            .map((e) => AssetSnapshot.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
 
-    bankBalance = prefs.getInt('bankBalance') ?? 7500;
-    principal = prefs.getInt('principal') ?? 10000;
-    bankAnnualInterestPercent = prefs.getDouble('bankAnnualInterestPercent') ?? 1.0;
+  static Child createSample({required String id, required String name}) => Child(
+        id: id,
+        name: name,
+        bankBalance: 7500,
+        principal: 10000,
+        stocks: [
+          Stock(id: 'sp500', name: 'S&P500', description: 'アメリカの大きな会社500社のチーム', invested: 2750, current: 3000),
+          Stock(id: 'nasdaq100', name: 'NASDAQ100', description: 'アメリカのすごい会社たちのチーム', invested: 1850, current: 2000),
+          Stock(id: 'nikkei225', name: '日経225', description: '日本の有名な会社225社のチーム', invested: 0, current: 0),
+          Stock(id: 'topix', name: 'TOPIX', description: '日本の会社をたくさん集めたチーム', invested: 0, current: 0),
+        ],
+        jobs: [
+          Job(id: '1', title: 'お皿洗い', reward: 50, status: JobStatus.pending),
+          Job(id: '2', title: 'ゴミ捨て', reward: 30, status: JobStatus.pending),
+          Job(id: '3', title: '部屋の掃除', reward: 100, status: JobStatus.waitingApproval),
+          Job(id: '4', title: '洗濯物をたたむ', reward: 50, status: JobStatus.done),
+          Job(id: '5', title: '犬の散歩', reward: 80, status: JobStatus.done),
+        ],
+        bucketItems: [
+          BucketItem(id: '1', name: 'レゴ スターウォーズ', price: 8000, emoji: '🧱'),
+          BucketItem(id: '2', name: 'Nintendo Switch2', price: 6000, emoji: '🎮'),
+          BucketItem(id: '3', name: '図鑑 恐竜', price: 2200, emoji: '📚'),
+          BucketItem(id: '4', name: '自転車', price: 30000, emoji: '🚲'),
+        ],
+      );
 
-    final jobsJson = prefs.getString('jobs');
-    if (jobsJson != null) {
-      jobs = (jsonDecode(jobsJson) as List)
-          .map((e) => Job.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
+  static Child createEmpty({required String id, required String name}) => Child(
+        id: id,
+        name: name,
+        bankBalance: 0,
+        principal: 0,
+        stocks: Stock.defaultList(),
+        jobs: [],
+        bucketItems: [],
+      );
+}
 
-    final stocksJson = prefs.getString('stocks');
-    if (stocksJson != null) {
-      stocks = (jsonDecode(stocksJson) as List)
-          .map((e) => Stock.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
+class AppState extends ChangeNotifier {
+  List<Child> children;
+  double bankAnnualInterestPercent;
+  List<CustomFund> customFunds;
 
-    final customFundsJson = prefs.getString('customFunds');
-    if (customFundsJson != null) {
-      customFunds = (jsonDecode(customFundsJson) as List)
-          .map((e) => CustomFund.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
+  AppState({
+    List<Child>? children,
+    this.bankAnnualInterestPercent = 1.0,
+    List<CustomFund>? customFunds,
+  })  : children = children ?? [Child.createSample(id: '1', name: 'たろう')],
+        customFunds = customFunds ?? [];
 
-    final requestedJson = prefs.getString('requestedItemIds');
-    if (requestedJson != null) {
-      _requestedItemIds.addAll((jsonDecode(requestedJson) as List).cast<String>());
-    }
+  Child childById(String id) => children.firstWhere((c) => c.id == id);
 
-    final purchasedJson = prefs.getString('purchasedItemIds');
-    if (purchasedJson != null) {
-      _purchasedItemIds.addAll((jsonDecode(purchasedJson) as List).cast<String>());
-    }
+  // ── 子ども管理 ─────────────────────────────────────────────
 
-    final bucketJson = prefs.getString('bucketItems');
-    if (bucketJson != null) {
-      bucketItems = (jsonDecode(bucketJson) as List)
-          .map((e) => BucketItem.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-  }
-
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('bankBalance', bankBalance);
-    await prefs.setInt('principal', principal);
-    await prefs.setDouble('bankAnnualInterestPercent', bankAnnualInterestPercent);
-    await prefs.setString('jobs', jsonEncode(jobs.map((j) => j.toJson()).toList()));
-    await prefs.setString('stocks', jsonEncode(stocks.map((s) => s.toJson()).toList()));
-    await prefs.setString('customFunds', jsonEncode(customFunds.map((f) => f.toJson()).toList()));
-    await prefs.setString('requestedItemIds', jsonEncode(_requestedItemIds.toList()));
-    await prefs.setString('purchasedItemIds', jsonEncode(_purchasedItemIds.toList()));
-    await prefs.setString('bucketItems', jsonEncode(bucketItems.map((b) => b.toJson()).toList()));
-  }
-
-  // ── お仕事操作 ───────────────────────────────────────────────
-
-  void addJob(String title, int reward) {
+  void addChild(String name) {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
-    jobs.add(Job(id: id, title: title, reward: reward, status: JobStatus.pending));
+    children.add(Child.createEmpty(id: id, name: name));
     notifyListeners();
     _save();
   }
 
-  void deleteJob(Job job) {
-    jobs.remove(job);
+  void deleteChild(Child child) {
+    children.remove(child);
     notifyListeners();
     _save();
   }
 
-  void reportDone(Job job) {
+  void renameChild(Child child, String name) {
+    child.name = name;
+    notifyListeners();
+    _save();
+  }
+
+  // ── お仕事 ──────────────────────────────────────────────────
+
+  void addJob(Child child, String title, int reward) {
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    child.jobs.add(Job(id: id, title: title, reward: reward, status: JobStatus.pending));
+    notifyListeners();
+    _save();
+  }
+
+  void deleteJob(Child child, Job job) {
+    child.jobs.remove(job);
+    notifyListeners();
+    _save();
+  }
+
+  void reportDone(Child child, Job job) {
     job.status = JobStatus.waitingApproval;
     notifyListeners();
     _save();
   }
 
-  void approveJob(Job job) {
+  void approveJob(Child child, Job job) {
     job.status = JobStatus.done;
-    bankBalance += job.reward;
-    principal += job.reward;
+    child.bankBalance += job.reward;
+    child.principal += job.reward;
     notifyListeners();
     _save();
   }
 
-  void rejectJob(Job job) {
+  void rejectJob(Child child, Job job) {
     job.status = JobStatus.pending;
     notifyListeners();
     _save();
   }
 
-  // ── 投資操作 ────────────────────────────────────────────────
+  void resetJob(Child child, Job job) {
+    job.status = JobStatus.pending;
+    notifyListeners();
+    _save();
+  }
 
-  bool canInvest(int amount) => amount > 0 && bankBalance >= amount;
+  // ── 投資 ────────────────────────────────────────────────────
 
-  void invest(Stock stock, int amount) {
-    if (!canInvest(amount)) return;
-    bankBalance -= amount;
+  bool canInvest(Child child, int amount) => amount > 0 && child.bankBalance >= amount;
+
+  void invest(Child child, Stock stock, int amount) {
+    if (!canInvest(child, amount)) return;
+    child.bankBalance -= amount;
     stock.invested += amount;
     stock.current += amount;
     notifyListeners();
     _save();
   }
 
-  void investInCustomFund(CustomFund fund, int amount) {
-    if (!canInvest(amount)) return;
-    bankBalance -= amount;
-    fund.invested += amount;
-    fund.current += amount;
+  ChildFundPosition? fundPositionFor(Child child, CustomFund fund) {
+    final idx = child.fundPositions.indexWhere((p) => p.fundId == fund.id);
+    return idx == -1 ? null : child.fundPositions[idx];
+  }
+
+  void investInCustomFund(Child child, CustomFund fund, int amount) {
+    if (!canInvest(child, amount)) return;
+    child.bankBalance -= amount;
+    final idx = child.fundPositions.indexWhere((p) => p.fundId == fund.id);
+    if (idx == -1) {
+      child.fundPositions.add(ChildFundPosition(fundId: fund.id, invested: amount, current: amount));
+    } else {
+      child.fundPositions[idx].invested += amount;
+      child.fundPositions[idx].current += amount;
+    }
     notifyListeners();
     _save();
   }
 
-  // ── 親ファンド・利率操作 ─────────────────────────────────────
+  // ── ほしいものリスト ─────────────────────────────────────────
+
+  void addBucketItem(Child child, String name, int price, String emoji) {
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    child.bucketItems.add(BucketItem(id: id, name: name, price: price, emoji: emoji));
+    notifyListeners();
+    _save();
+  }
+
+  void deleteBucketItem(Child child, BucketItem item) {
+    child.bucketItems.remove(item);
+    child.requestedItemIds.remove(item.id);
+    child.purchasedItemIds.remove(item.id);
+    notifyListeners();
+    _save();
+  }
+
+  void requestPurchase(Child child, BucketItem item) {
+    child.requestedItemIds.add(item.id);
+    notifyListeners();
+    _save();
+  }
+
+  bool canApprovePurchase(Child child, BucketItem item) => child.bankBalance >= item.price;
+
+  void approvePurchase(Child child, BucketItem item) {
+    if (!canApprovePurchase(child, item)) return;
+    child.requestedItemIds.remove(item.id);
+    child.purchasedItemIds.add(item.id);
+    child.bankBalance -= item.price;
+    notifyListeners();
+    _save();
+  }
+
+  void rejectPurchase(Child child, BucketItem item) {
+    child.requestedItemIds.remove(item.id);
+    notifyListeners();
+    _save();
+  }
+
+  // ── 親ファンド・利率 ─────────────────────────────────────────
 
   void setBankInterestRate(double percent) {
     bankAnnualInterestPercent = percent;
@@ -340,8 +476,6 @@ class AppState extends ChangeNotifier {
       baseStockId: baseStockId,
       multiplier: multiplier,
       bonusMonthlyPercent: bonusMonthlyPercent,
-      invested: 0,
-      current: 0,
     ));
     notifyListeners();
     _save();
@@ -349,79 +483,73 @@ class AppState extends ChangeNotifier {
 
   void deleteCustomFund(CustomFund fund) {
     customFunds.remove(fund);
+    for (final child in children) {
+      child.fundPositions.removeWhere((p) => p.fundId == fund.id);
+    }
     notifyListeners();
     _save();
   }
 
-  // indexMonthlyReturns: 各指数の今月のリターン（例: {'sp500': 0.023} = +2.3%）
   void applyMonthlyReturns(Map<String, double> indexMonthlyReturns) {
-    // 通常の指数ファンドを更新
-    for (final stock in stocks) {
-      final ret = indexMonthlyReturns[stock.id] ?? 0.0;
-      if (ret != 0 && stock.current > 0) {
-        stock.current += (stock.current * ret).round();
+    for (final child in children) {
+      for (final stock in child.stocks) {
+        final ret = indexMonthlyReturns[stock.id] ?? 0.0;
+        if (ret != 0 && stock.current > 0) {
+          stock.current += (stock.current * ret).round();
+        }
       }
+
+      for (final position in child.fundPositions) {
+        final fundIdx = customFunds.indexWhere((f) => f.id == position.fundId);
+        if (fundIdx == -1) continue;
+        final fund = customFunds[fundIdx];
+        double monthlyReturn = fund.bonusMonthlyPercent / 100;
+        if (fund.baseStockId != null) {
+          final indexReturn = indexMonthlyReturns[fund.baseStockId] ?? 0.0;
+          monthlyReturn += indexReturn * fund.multiplier;
+        }
+        if (position.current > 0) {
+          position.current += (position.current * monthlyReturn).round();
+        }
+      }
+
+      final interest = (child.bankBalance * bankAnnualInterestPercent / 100 / 12).round();
+      child.bankBalance += interest;
+
+      child.assetHistory.add(AssetSnapshot(date: DateTime.now(), totalAssets: child.totalAssets));
+    }
+    notifyListeners();
+    _save();
+  }
+
+  // ── 保存・読み込み ──────────────────────────────────────────
+
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    bankAnnualInterestPercent = prefs.getDouble('bankAnnualInterestPercent') ?? 1.0;
+
+    final customFundsJson = prefs.getString('customFunds');
+    if (customFundsJson != null) {
+      customFunds = (jsonDecode(customFundsJson) as List)
+          .map((e) => CustomFund.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
 
-    // カスタムファンドを更新
-    for (final fund in customFunds) {
-      double monthlyReturn = fund.bonusMonthlyPercent / 100;
-      if (fund.baseStockId != null) {
-        final indexReturn = indexMonthlyReturns[fund.baseStockId] ?? 0.0;
-        monthlyReturn += indexReturn * fund.multiplier;
-      }
-      if (fund.current > 0) {
-        fund.current += (fund.current * monthlyReturn).round();
-      }
+    final childrenJson = prefs.getString('children');
+    if (childrenJson != null) {
+      children = (jsonDecode(childrenJson) as List)
+          .map((e) => Child.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
-
-    // 銀行利息を加算（利息は gainLoss に反映、principal は増やさない）
-    final interest = (bankBalance * bankAnnualInterestPercent / 100 / 12).round();
-    bankBalance += interest;
-
-    notifyListeners();
-    _save();
   }
 
-  // ── ほしいものリスト操作 ─────────────────────────────────────
-
-  void addBucketItem(String name, int price, String emoji) {
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
-    bucketItems.add(BucketItem(id: id, name: name, price: price, emoji: emoji));
-    notifyListeners();
-    _save();
-  }
-
-  void deleteBucketItem(BucketItem item) {
-    bucketItems.remove(item);
-    _requestedItemIds.remove(item.id);
-    _purchasedItemIds.remove(item.id);
-    notifyListeners();
-    _save();
-  }
-
-  // ── 購入申請操作 ─────────────────────────────────────────────
-
-  void requestPurchase(BucketItem item) {
-    _requestedItemIds.add(item.id);
-    notifyListeners();
-    _save();
-  }
-
-  bool canApprovePurchase(BucketItem item) => bankBalance >= item.price;
-
-  void approvePurchase(BucketItem item) {
-    if (!canApprovePurchase(item)) return;
-    _requestedItemIds.remove(item.id);
-    _purchasedItemIds.add(item.id);
-    bankBalance -= item.price;
-    notifyListeners();
-    _save();
-  }
-
-  void rejectPurchase(BucketItem item) {
-    _requestedItemIds.remove(item.id);
-    notifyListeners();
-    _save();
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('bankAnnualInterestPercent', bankAnnualInterestPercent);
+    await prefs.setString(
+        'customFunds', jsonEncode(customFunds.map((f) => f.toJson()).toList()));
+    await prefs.setString(
+        'children', jsonEncode(children.map((c) => c.toJson()).toList()));
   }
 }

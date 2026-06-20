@@ -10,33 +10,31 @@ const _presetEmojis = [
   '👟', '🎀', '🌈', '🐶', '🐱', '🦖',
 ];
 
-
 class BucketListScreen extends StatelessWidget {
-  const BucketListScreen({super.key});
+  final String childId;
+  const BucketListScreen({super.key, required this.childId});
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final child = state.childById(childId);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ほしいものリスト'),
-        backgroundColor: const Color(0xFF4CAF50),
-        foregroundColor: Colors.white,
-      ),
-      body: state.bucketItems.isEmpty
+      body: child.bucketItems.isEmpty
           ? const Center(
-              child: Text('ほしいものを追加しよう！', style: TextStyle(color: Colors.grey)),
+              child: Text('ほしいものを追加しよう！',
+                  style: TextStyle(color: Colors.grey)),
             )
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                for (final item in state.bucketItems) ...[
+                for (final item in child.bucketItems) ...[
                   _BucketItemCard(
+                    childId: childId,
                     item: item,
-                    currentAssets: state.totalAssets,
-                    isRequested: state.isRequested(item),
-                    isPurchased: state.isPurchased(item),
+                    currentAssets: child.totalAssets,
+                    isRequested: child.isRequested(item),
+                    isPurchased: child.isPurchased(item),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -45,7 +43,7 @@ class BucketListScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton(
         onPressed: () => showDialog(
           context: context,
-          builder: (_) => const _AddBucketItemDialog(),
+          builder: (_) => _AddBucketItemDialog(childId: childId),
         ),
         backgroundColor: const Color(0xFF4CAF50),
         foregroundColor: Colors.white,
@@ -56,12 +54,14 @@ class BucketListScreen extends StatelessWidget {
 }
 
 class _BucketItemCard extends StatelessWidget {
+  final String childId;
   final BucketItem item;
   final int currentAssets;
   final bool isRequested;
   final bool isPurchased;
 
   const _BucketItemCard({
+    required this.childId,
     required this.item,
     required this.currentAssets,
     required this.isRequested,
@@ -89,20 +89,24 @@ class _BucketItemCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(item.name,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
                       Text('¥${formatYen(item.price)}',
-                          style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                          style: const TextStyle(
+                              fontSize: 14, color: Colors.grey)),
                     ],
                   ),
                 ),
                 _ActionButton(
+                  childId: childId,
                   item: item,
                   canBuy: canBuy,
                   isRequested: isRequested,
                   isPurchased: isPurchased,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                  icon: const Icon(Icons.delete_outline,
+                      color: Colors.red, size: 20),
                   onPressed: () => showDialog(
                     context: context,
                     builder: (_) => AlertDialog(
@@ -115,7 +119,11 @@ class _BucketItemCard extends StatelessWidget {
                         ),
                         TextButton(
                           onPressed: () {
-                            context.read<AppState>().deleteBucketItem(item);
+                            context
+                                .read<AppState>()
+                                .deleteBucketItem(
+                                    context.read<AppState>().childById(childId),
+                                    item);
                             Navigator.of(context).pop();
                           },
                           style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -145,11 +153,13 @@ class _BucketItemCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color: canBuy ? const Color(0xFF4CAF50) : Colors.grey,
-                      fontWeight: canBuy ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          canBuy ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                   Text('${(progress * 100).toStringAsFixed(0)}%',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ],
@@ -161,12 +171,14 @@ class _BucketItemCard extends StatelessWidget {
 }
 
 class _ActionButton extends StatelessWidget {
+  final String childId;
   final BucketItem item;
   final bool canBuy;
   final bool isRequested;
   final bool isPurchased;
 
   const _ActionButton({
+    required this.childId,
     required this.item,
     required this.canBuy,
     required this.isRequested,
@@ -193,7 +205,10 @@ class _ActionButton extends StatelessWidget {
 
     if (canBuy) {
       return ElevatedButton(
-        onPressed: () => context.read<AppState>().requestPurchase(item),
+        onPressed: () {
+          final state = context.read<AppState>();
+          state.requestPurchase(state.childById(childId), item);
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF4CAF50),
           foregroundColor: Colors.white,
@@ -208,7 +223,8 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _AddBucketItemDialog extends StatefulWidget {
-  const _AddBucketItemDialog();
+  final String childId;
+  const _AddBucketItemDialog({required this.childId});
 
   @override
   State<_AddBucketItemDialog> createState() => _AddBucketItemDialogState();
@@ -230,8 +246,8 @@ class _AddBucketItemDialogState extends State<_AddBucketItemDialog> {
     final name = _nameController.text.trim();
     final price = int.tryParse(_priceController.text.replaceAll(',', ''));
     if (name.isEmpty || price == null || price <= 0) return;
-
-    context.read<AppState>().addBucketItem(name, price, _selectedEmoji);
+    final state = context.read<AppState>();
+    state.addBucketItem(state.childById(widget.childId), name, price, _selectedEmoji);
     Navigator.of(context).pop();
   }
 
@@ -246,13 +262,15 @@ class _AddBucketItemDialogState extends State<_AddBucketItemDialog> {
           children: [
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: '名前', hintText: '例: レゴ'),
+              decoration:
+                  const InputDecoration(labelText: '名前', hintText: '例: レゴ'),
               autofocus: true,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _priceController,
-              decoration: const InputDecoration(labelText: '値段（円）', hintText: '例: 3,000'),
+              decoration: const InputDecoration(
+                  labelText: '値段（円）', hintText: '例: 3,000'),
               keyboardType: TextInputType.number,
               inputFormatters: [ThousandsSeparatorFormatter()],
             ),
@@ -270,15 +288,20 @@ class _AddBucketItemDialogState extends State<_AddBucketItemDialog> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: selected ? const Color(0xFFE8F5E9) : Colors.grey[100],
+                      color: selected
+                          ? const Color(0xFFE8F5E9)
+                          : Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: selected ? const Color(0xFF4CAF50) : Colors.transparent,
+                        color: selected
+                            ? const Color(0xFF4CAF50)
+                            : Colors.transparent,
                         width: 2,
                       ),
                     ),
                     child: Center(
-                      child: Text(emoji, style: const TextStyle(fontSize: 22)),
+                      child:
+                          Text(emoji, style: const TextStyle(fontSize: 22)),
                     ),
                   ),
                 );

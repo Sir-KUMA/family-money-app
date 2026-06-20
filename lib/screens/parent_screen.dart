@@ -15,11 +15,13 @@ class ParentScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: const SingleChildScrollView(
+        padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
+            _ChildManagementSection(),
+            SizedBox(height: 24),
             _ApprovalSection(),
             SizedBox(height: 24),
             _PurchaseRequestSection(),
@@ -31,8 +33,6 @@ class ParentScreen extends StatelessWidget {
             _JobManagementSection(),
             SizedBox(height: 24),
             _ChildrenAssetsSection(),
-            SizedBox(height: 24),
-            _FundsSection(),
           ],
         ),
       ),
@@ -40,13 +40,205 @@ class ParentScreen extends StatelessWidget {
   }
 }
 
+// ── 子ども管理セクション ──────────────────────────────────────
+
+class _ChildManagementSection extends StatelessWidget {
+  const _ChildManagementSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('子ども管理',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => const _AddChildDialog(),
+              ),
+              icon: const Icon(Icons.person_add),
+              label: const Text('追加'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...state.children.map((child) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE8F5E9),
+                  child: Icon(Icons.child_care, color: Color(0xFF4CAF50)),
+                ),
+                title: Text(child.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('総資産: ¥${formatYen(child.totalAssets)}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 20),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => _RenameChildDialog(child: child),
+                      ),
+                    ),
+                    if (state.children.length > 1)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            color: Colors.red, size: 20),
+                        onPressed: () => showDialog(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('子どもを削除'),
+                            content: Text('「${child.name}」のデータをすべて削除しますか？'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('キャンセル'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  context.read<AppState>().deleteChild(child);
+                                  Navigator.of(context).pop();
+                                },
+                                style: TextButton.styleFrom(
+                                    foregroundColor: Colors.red),
+                                child: const Text('削除'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            )),
+      ],
+    );
+  }
+}
+
+class _AddChildDialog extends StatefulWidget {
+  const _AddChildDialog();
+
+  @override
+  State<_AddChildDialog> createState() => _AddChildDialogState();
+}
+
+class _AddChildDialogState extends State<_AddChildDialog> {
+  final _nameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('子どもを追加'),
+      content: TextField(
+        controller: _nameController,
+        decoration: const InputDecoration(labelText: '名前', hintText: '例: はなこ'),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final name = _nameController.text.trim();
+            if (name.isEmpty) return;
+            context.read<AppState>().addChild(name);
+            Navigator.of(context).pop();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1565C0),
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('追加'),
+        ),
+      ],
+    );
+  }
+}
+
+class _RenameChildDialog extends StatefulWidget {
+  final Child child;
+  const _RenameChildDialog({required this.child});
+
+  @override
+  State<_RenameChildDialog> createState() => _RenameChildDialogState();
+}
+
+class _RenameChildDialogState extends State<_RenameChildDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.child.name);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('名前を変更'),
+      content: TextField(
+        controller: _controller,
+        decoration: const InputDecoration(labelText: '名前'),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final name = _controller.text.trim();
+            if (name.isEmpty) return;
+            context.read<AppState>().renameChild(widget.child, name);
+            Navigator.of(context).pop();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1565C0),
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('変更'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── お仕事チェック待ちセクション ──────────────────────────────
+
 class _ApprovalSection extends StatelessWidget {
   const _ApprovalSection();
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final waiting = state.waitingJobs;
+    final waitingAll = [
+      for (final child in state.children)
+        for (final job in child.waitingJobs) (child: child, job: job),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,19 +248,22 @@ class _ApprovalSection extends StatelessWidget {
             const Text('お仕事チェック待ち',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(width: 8),
-            if (waiting.isNotEmpty)
+            if (waitingAll.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration:
-                    BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
-                child: Text('${waiting.length}',
+                decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(12)),
+                child: Text('${waitingAll.length}',
                     style: const TextStyle(
-                        color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
               ),
           ],
         ),
         const SizedBox(height: 12),
-        if (waiting.isEmpty)
+        if (waitingAll.isEmpty)
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
@@ -76,26 +271,27 @@ class _ApprovalSection extends StatelessWidget {
                 children: [
                   Icon(Icons.check_circle, color: Color(0xFF4CAF50)),
                   SizedBox(width: 8),
-                  Text('チェック待ちはありません', style: TextStyle(color: Colors.grey)),
+                  Text('チェック待ちはありません',
+                      style: TextStyle(color: Colors.grey)),
                 ],
               ),
             ),
           )
         else
-          ...waiting.map((job) => _ApprovalCard(job: job)),
+          ...waitingAll.map((item) => _JobApprovalCard(
+              child: item.child, job: item.job)),
       ],
     );
   }
 }
 
-class _ApprovalCard extends StatelessWidget {
+class _JobApprovalCard extends StatelessWidget {
+  final Child child;
   final Job job;
-  const _ApprovalCard({required this.job});
+  const _JobApprovalCard({required this.child, required this.job});
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<AppState>();
-
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -105,40 +301,49 @@ class _ApprovalCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Color(0xFF1565C0),
-                  child: Text('た', style: TextStyle(color: Colors.white, fontSize: 12)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(child.name,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF4CAF50))),
                 ),
                 const SizedBox(width: 8),
-                const Text('たろう', style: TextStyle(fontSize: 14, color: Colors.grey)),
-                const Spacer(),
+                Expanded(
+                  child: Text(job.title,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
                 Text('¥${job.reward}',
                     style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF4CAF50))),
+                        fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(job.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => state.rejectJob(job),
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                    onPressed: () =>
+                        context.read<AppState>().rejectJob(child, job),
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red),
                     child: const Text('やり直し'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => state.approveJob(job),
+                    onPressed: () =>
+                        context.read<AppState>().approveJob(child, job),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4CAF50),
                       foregroundColor: Colors.white,
                     ),
-                    child: const Text('承認'),
+                    child: const Text('承認 ✓'),
                   ),
                 ),
               ],
@@ -150,13 +355,18 @@ class _ApprovalCard extends StatelessWidget {
   }
 }
 
+// ── 購入申請セクション ────────────────────────────────────────
+
 class _PurchaseRequestSection extends StatelessWidget {
   const _PurchaseRequestSection();
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final requests = state.purchaseRequests;
+    final requestsAll = [
+      for (final child in state.children)
+        for (final item in child.purchaseRequests) (child: child, item: item),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,46 +376,46 @@ class _PurchaseRequestSection extends StatelessWidget {
             const Text('購入申請',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(width: 8),
-            if (requests.isNotEmpty)
+            if (requestsAll.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration:
-                    BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
-                child: Text('${requests.length}',
+                decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius: BorderRadius.circular(12)),
+                child: Text('${requestsAll.length}',
                     style: const TextStyle(
-                        color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
               ),
           ],
         ),
         const SizedBox(height: 12),
-        if (requests.isEmpty)
+        if (requestsAll.isEmpty)
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Color(0xFF4CAF50)),
-                  SizedBox(width: 8),
-                  Text('購入申請はありません', style: TextStyle(color: Colors.grey)),
-                ],
-              ),
+              child: Text('購入申請はありません',
+                  style: TextStyle(color: Colors.grey)),
             ),
           )
         else
-          ...requests.map((item) => _PurchaseRequestCard(item: item)),
+          ...requestsAll.map((r) => _PurchaseApprovalCard(
+              child: r.child, item: r.item)),
       ],
     );
   }
 }
 
-class _PurchaseRequestCard extends StatelessWidget {
+class _PurchaseApprovalCard extends StatelessWidget {
+  final Child child;
   final BucketItem item;
-  const _PurchaseRequestCard({required this.item});
+  const _PurchaseApprovalCard({required this.child, required this.item});
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final canApprove = state.canApprovePurchase(item);
+    final canApprove = state.canApprovePurchase(child, item);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -216,26 +426,27 @@ class _PurchaseRequestCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Color(0xFF1565C0),
-                  child: Text('た', style: TextStyle(color: Colors.white, fontSize: 12)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(child.name,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF4CAF50))),
                 ),
                 const SizedBox(width: 8),
-                const Text('たろう', style: TextStyle(fontSize: 14, color: Colors.grey)),
-                const Spacer(),
-                Text('¥${formatYen(item.price)}',
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
                 Text(item.emoji, style: const TextStyle(fontSize: 20)),
                 const SizedBox(width: 8),
-                Text(item.name,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(item.name,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+                Text('¥${formatYen(item.price)}',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),
             if (!canApprove) ...[
@@ -248,7 +459,8 @@ class _PurchaseRequestCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => context.read<AppState>().rejectPurchase(item),
+                    onPressed: () =>
+                        context.read<AppState>().rejectPurchase(child, item),
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                     child: const Text('却下'),
                   ),
@@ -257,7 +469,9 @@ class _PurchaseRequestCard extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: canApprove
-                        ? () => context.read<AppState>().approvePurchase(item)
+                        ? () => context
+                            .read<AppState>()
+                            .approvePurchase(child, item)
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4CAF50),
@@ -332,12 +546,12 @@ class _MonthlyUpdateSectionState extends State<_MonthlyUpdateSection> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final interest = (state.bankBalance * state.bankAnnualInterestPercent / 100 / 12).round();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('月次更新', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text('月次更新',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
 
         // 銀行年利カード
@@ -347,28 +561,38 @@ class _MonthlyUpdateSectionState extends State<_MonthlyUpdateSection> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('銀行年利', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text('銀行年利',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Text('${state.bankAnnualInterestPercent.toStringAsFixed(1)}%',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue)),
+                    Text(
+                      '${state.bankAnnualInterestPercent.toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue),
+                    ),
                     const SizedBox(width: 8),
                     TextButton(
                       onPressed: () => showDialog(
                         context: context,
-                        builder: (_) => _InterestRateDialog(current: state.bankAnnualInterestPercent),
+                        builder: (_) => _InterestRateDialog(
+                            current: state.bankAnnualInterestPercent),
                       ),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: const Text('変更'),
                     ),
                     const Spacer(),
-                    Text('今月の利息（予定）: +¥${formatYen(interest)}',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(
+                      '利息は月次更新で各子どもに加算',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
                   ],
                 ),
               ],
@@ -385,7 +609,8 @@ class _MonthlyUpdateSectionState extends State<_MonthlyUpdateSection> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('指数騰落率', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text('指数騰落率',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
                 const Text('「1M」を選ぶと月次騰落率が確認できます',
                     style: TextStyle(fontSize: 11, color: Colors.blue)),
                 const SizedBox(height: 12),
@@ -396,7 +621,9 @@ class _MonthlyUpdateSectionState extends State<_MonthlyUpdateSection> {
                           SizedBox(
                             width: 90,
                             child: Text(entry.value,
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500)),
                           ),
                           Expanded(
                             child: TextField(
@@ -405,11 +632,13 @@ class _MonthlyUpdateSectionState extends State<_MonthlyUpdateSection> {
                                 suffixText: '%',
                                 hintText: '0.0',
                                 isDense: true,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 8),
                                 border: OutlineInputBorder(),
                               ),
-                              keyboardType: const TextInputType.numberWithOptions(
-                                  signed: true, decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      signed: true, decimal: true),
                             ),
                           ),
                           IconButton(
@@ -419,7 +648,8 @@ class _MonthlyUpdateSectionState extends State<_MonthlyUpdateSection> {
                             onPressed: () async {
                               final url = Uri.parse(_urls[entry.key]!);
                               if (await canLaunchUrl(url)) {
-                                await launchUrl(url, mode: LaunchMode.externalApplication);
+                                await launchUrl(url,
+                                    mode: LaunchMode.externalApplication);
                               }
                             },
                           ),
@@ -473,12 +703,14 @@ class _InterestRateDialogState extends State<_InterestRateDialog> {
       title: const Text('銀行年利を設定'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
-        children: options.map((rate) => RadioListTile<double>(
-          title: Text('${rate.toStringAsFixed(1)}%'),
-          value: rate,
-          groupValue: _selected,
-          onChanged: (v) => setState(() => _selected = v!),
-        )).toList(),
+        children: options
+            .map((rate) => RadioListTile<double>(
+                  title: Text('${rate.toStringAsFixed(1)}%'),
+                  value: rate,
+                  groupValue: _selected,
+                  onChanged: (v) => setState(() => _selected = v!),
+                ))
+            .toList(),
       ),
       actions: [
         TextButton(
@@ -515,7 +747,8 @@ class _CustomFundManagementSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Text('親ファンド管理', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('親ファンド管理',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const Spacer(),
             TextButton.icon(
               onPressed: () => showDialog(
@@ -532,7 +765,8 @@ class _CustomFundManagementSection extends StatelessWidget {
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
-              child: Text('ファンドがありません', style: TextStyle(color: Colors.grey)),
+              child: Text('ファンドがありません',
+                  style: TextStyle(color: Colors.grey)),
             ),
           )
         else
@@ -551,7 +785,8 @@ class _CustomFundCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
             Text(fund.emoji, style: const TextStyle(fontSize: 24)),
@@ -561,9 +796,11 @@ class _CustomFundCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(fund.name,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.bold)),
                   Text(fund.description,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
@@ -660,40 +897,48 @@ class _AddCustomFundDialogState extends State<_AddCustomFundDialog> {
           children: [
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'ファンド名', hintText: '例: たろうスペシャル'),
+              decoration: const InputDecoration(
+                  labelText: 'ファンド名', hintText: '例: たろうスペシャル'),
               autofocus: true,
             ),
             const SizedBox(height: 16),
-            const Text('絵文字', style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const Text('絵文字',
+                style: TextStyle(fontSize: 13, color: Colors.grey)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _emojis.map((e) => GestureDetector(
-                    onTap: () => setState(() => _selectedEmoji = e),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: e == _selectedEmoji
-                            ? const Color(0xFFE8F5E9)
-                            : Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: e == _selectedEmoji
-                              ? const Color(0xFF4CAF50)
-                              : Colors.transparent,
-                          width: 2,
+              children: _emojis
+                  .map((e) => GestureDetector(
+                        onTap: () => setState(() => _selectedEmoji = e),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: e == _selectedEmoji
+                                ? const Color(0xFFE8F5E9)
+                                : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: e == _selectedEmoji
+                                  ? const Color(0xFF4CAF50)
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Center(
+                              child: Text(e,
+                                  style: const TextStyle(fontSize: 22))),
                         ),
-                      ),
-                      child: Center(child: Text(e, style: const TextStyle(fontSize: 22))),
-                    ),
-                  )).toList(),
+                      ))
+                  .toList(),
             ),
             const SizedBox(height: 16),
-            const Text('参照指数', style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const Text('参照指数',
+                style: TextStyle(fontSize: 13, color: Colors.grey)),
             ..._baseStockOptions.map((opt) => RadioListTile<String?>(
-                  title: Text(opt.label, style: const TextStyle(fontSize: 14)),
+                  title: Text(opt.label,
+                      style: const TextStyle(fontSize: 14)),
                   value: opt.id,
                   groupValue: _baseStockId,
                   onChanged: (v) => setState(() => _baseStockId = v),
@@ -701,27 +946,37 @@ class _AddCustomFundDialogState extends State<_AddCustomFundDialog> {
                 )),
             if (_baseStockId != null) ...[
               const SizedBox(height: 8),
-              const Text('倍率', style: TextStyle(fontSize: 13, color: Colors.grey)),
+              const Text('倍率',
+                  style: TextStyle(fontSize: 13, color: Colors.grey)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
-                children: _multiplierOptions.map((m) => ChoiceChip(
-                      label: Text('${m}x'),
-                      selected: _multiplier == m,
-                      onSelected: (_) => setState(() => _multiplier = m),
-                    )).toList(),
+                children: _multiplierOptions
+                    .map((m) => ChoiceChip(
+                          label: Text('${m}x'),
+                          selected: _multiplier == m,
+                          onSelected: (_) =>
+                              setState(() => _multiplier = m),
+                        ))
+                    .toList(),
               ),
             ],
             const SizedBox(height: 16),
-            const Text('月次ボーナス', style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const Text('月次ボーナス',
+                style: TextStyle(fontSize: 13, color: Colors.grey)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: _bonusOptions.map((b) => ChoiceChip(
-                    label: Text(b == 0 ? 'なし' : '+${b.toStringAsFixed(0)}%'),
-                    selected: _bonusMonthlyPercent == b,
-                    onSelected: (_) => setState(() => _bonusMonthlyPercent = b),
-                  )).toList(),
+              children: _bonusOptions
+                  .map((b) => ChoiceChip(
+                        label: Text(b == 0
+                            ? 'なし'
+                            : '+${b.toStringAsFixed(0)}%'),
+                        selected: _bonusMonthlyPercent == b,
+                        onSelected: (_) =>
+                            setState(() => _bonusMonthlyPercent = b),
+                      ))
+                  .toList(),
             ),
           ],
         ),
@@ -746,131 +1001,131 @@ class _AddCustomFundDialogState extends State<_AddCustomFundDialog> {
 
 // ── お仕事管理セクション ─────────────────────────────────────
 
-class _JobManagementSection extends StatelessWidget {
+class _JobManagementSection extends StatefulWidget {
   const _JobManagementSection();
+
+  @override
+  State<_JobManagementSection> createState() => _JobManagementSectionState();
+}
+
+class _JobManagementSectionState extends State<_JobManagementSection> {
+  int _selectedChildIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    if (state.children.isEmpty) return const SizedBox.shrink();
+
+    if (_selectedChildIndex >= state.children.length) {
+      _selectedChildIndex = 0;
+    }
+    final child = state.children[_selectedChildIndex];
+
+    final allJobs = [
+      ...child.doneJobs,
+      ...child.waitingJobs,
+      ...child.pendingJobs,
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Text('お仕事管理', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () => showDialog(
-                context: context,
-                builder: (_) => const _AddJobDialog(),
-              ),
-              icon: const Icon(Icons.add),
-              label: const Text('追加'),
-            ),
-          ],
-        ),
+        const Text('お仕事管理',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        if (state.jobs.isEmpty)
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('お仕事がありません', style: TextStyle(color: Colors.grey)),
+        if (state.children.length > 1)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: state.children.asMap().entries.map((e) {
+                final selected = e.key == _selectedChildIndex;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(e.value.name),
+                    selected: selected,
+                    onSelected: (_) =>
+                        setState(() => _selectedChildIndex = e.key),
+                  ),
+                );
+              }).toList(),
             ),
-          )
-        else
-          ...[...state.doneJobs, ...state.waitingJobs, ...state.pendingJobs]
-              .map((job) => _JobManagementCard(job: job)),
+          ),
+        const SizedBox(height: 8),
+        Card(
+          child: Column(
+            children: [
+              ...allJobs.map((job) => _JobManagementRow(
+                    child: child,
+                    job: job,
+                  )),
+              ListTile(
+                leading: const Icon(Icons.add, color: Color(0xFF4CAF50)),
+                title: const Text('お仕事を追加',
+                    style: TextStyle(color: Color(0xFF4CAF50))),
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => _AddJobDialog(child: child),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
-class _JobManagementCard extends StatelessWidget {
+class _JobManagementRow extends StatelessWidget {
+  final Child child;
   final Job job;
-  const _JobManagementCard({required this.job});
+  const _JobManagementRow({required this.child, required this.job});
 
   @override
   Widget build(BuildContext context) {
-    final statusLabel = switch (job.status) {
-      JobStatus.pending => '未完了',
-      JobStatus.waitingApproval => 'チェック待ち',
-      JobStatus.done => '完了',
-    };
-    final statusColor = switch (job.status) {
-      JobStatus.pending => Colors.grey,
-      JobStatus.waitingApproval => Colors.orange,
-      JobStatus.done => const Color(0xFF4CAF50),
+    final state = context.read<AppState>();
+
+    final (color, label) = switch (job.status) {
+      JobStatus.done => (Colors.grey, '完了'),
+      JobStatus.waitingApproval => (Colors.orange, 'チェック待ち'),
+      JobStatus.pending => (const Color(0xFF4CAF50), '未完了'),
     };
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(job.title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text('¥${job.reward}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(statusLabel, style: TextStyle(fontSize: 11, color: statusColor)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+    return ListTile(
+      title: Text(job.title),
+      subtitle: Text('¥${job.reward}'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
             ),
-            if (job.status != JobStatus.pending)
-              IconButton(
-                icon: const Icon(Icons.refresh, color: Colors.blue),
-                tooltip: '未完了に戻す',
-                onPressed: () => context.read<AppState>().rejectJob(job),
-              ),
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 11, color: color, fontWeight: FontWeight.bold)),
+          ),
+          if (job.status == JobStatus.done)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: () => showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('お仕事を削除'),
-                  content: Text('「${job.title}」を削除しますか？'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('キャンセル'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        context.read<AppState>().deleteJob(job);
-                        Navigator.of(context).pop();
-                      },
-                      style: TextButton.styleFrom(foregroundColor: Colors.red),
-                      child: const Text('削除'),
-                    ),
-                  ],
-                ),
-              ),
+              icon: const Icon(Icons.refresh, color: Colors.blue, size: 20),
+              tooltip: '未完了に戻す',
+              onPressed: () => state.resetJob(child, job),
             ),
-          ],
-        ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+            onPressed: () => state.deleteJob(child, job),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _AddJobDialog extends StatefulWidget {
-  const _AddJobDialog();
+  final Child child;
+  const _AddJobDialog({required this.child});
 
   @override
   State<_AddJobDialog> createState() => _AddJobDialogState();
@@ -887,15 +1142,6 @@ class _AddJobDialogState extends State<_AddJobDialog> {
     super.dispose();
   }
 
-  void _submit() {
-    final title = _titleController.text.trim();
-    final reward = int.tryParse(_rewardController.text.trim());
-    if (title.isEmpty || reward == null || reward <= 0) return;
-
-    context.read<AppState>().addJob(title, reward);
-    Navigator.of(context).pop();
-  }
-
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -905,16 +1151,16 @@ class _AddJobDialogState extends State<_AddJobDialog> {
         children: [
           TextField(
             controller: _titleController,
-            decoration: const InputDecoration(labelText: 'お仕事の名前', hintText: '例: お皿洗い'),
+            decoration: const InputDecoration(
+                labelText: 'お仕事名', hintText: '例: お皿洗い'),
             autofocus: true,
-            onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _rewardController,
-            decoration: const InputDecoration(labelText: '報酬（円）', hintText: '例: 50'),
+            decoration:
+                const InputDecoration(labelText: '報酬（円）', hintText: '例: 50'),
             keyboardType: TextInputType.number,
-            onSubmitted: (_) => _submit(),
           ),
         ],
       ),
@@ -924,9 +1170,15 @@ class _AddJobDialogState extends State<_AddJobDialog> {
           child: const Text('キャンセル'),
         ),
         ElevatedButton(
-          onPressed: _submit,
+          onPressed: () {
+            final title = _titleController.text.trim();
+            final reward = int.tryParse(_rewardController.text.trim());
+            if (title.isEmpty || reward == null || reward <= 0) return;
+            context.read<AppState>().addJob(widget.child, title, reward);
+            Navigator.of(context).pop();
+          },
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4CAF50),
+            backgroundColor: const Color(0xFF1565C0),
             foregroundColor: Colors.white,
           ),
           child: const Text('追加'),
@@ -935,6 +1187,8 @@ class _AddJobDialogState extends State<_AddJobDialog> {
     );
   }
 }
+
+// ── 子どもの資産一覧 ─────────────────────────────────────────
 
 class _ChildrenAssetsSection extends StatelessWidget {
   const _ChildrenAssetsSection();
@@ -946,137 +1200,54 @@ class _ChildrenAssetsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('子どもの資産', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text('子どもの資産一覧',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        _ChildAssetCard(
-          name: 'たろう',
-          totalAssets: state.totalAssets,
-          bank: state.bankBalance,
-          stocks: state.stocksValue,
-          gainLoss: state.gainLoss,
-        ),
+        ...state.children.map((child) {
+          final gain = child.gainLoss;
+          final gainColor = gain >= 0 ? const Color(0xFF4CAF50) : Colors.red;
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(child.name,
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      Text('¥${formatYen(child.totalAssets)}',
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        '${gain >= 0 ? '+' : ''}¥${formatYen(gain)}',
+                        style: TextStyle(fontSize: 13, color: gainColor),
+                      ),
+                      const SizedBox(width: 12),
+                      Text('銀行 ¥${formatYen(child.bankBalance)}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey)),
+                      const SizedBox(width: 8),
+                      Text('証券 ¥${formatYen(child.stocksValue)}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ],
-    );
-  }
-}
-
-class _ChildAssetCard extends StatelessWidget {
-  final String name;
-  final int totalAssets;
-  final int bank;
-  final int stocks;
-  final int gainLoss;
-
-  const _ChildAssetCard({
-    required this.name,
-    required this.totalAssets,
-    required this.bank,
-    required this.stocks,
-    required this.gainLoss,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isPositive = gainLoss >= 0;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: const Color(0xFF1565C0),
-                  child: Text(name[0], style: const TextStyle(color: Colors.white)),
-                ),
-                const SizedBox(width: 8),
-                Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const Spacer(),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('¥${formatYen(totalAssets)}',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    Text(
-                      '${isPositive ? '+' : '-'}¥${formatYen(gainLoss)}',
-                      style: TextStyle(
-                          fontSize: 12, color: isPositive ? const Color(0xFF4CAF50) : Colors.red),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              children: [
-                const Icon(Icons.account_balance, color: Colors.blue, size: 16),
-                const SizedBox(width: 4),
-                const Text('銀行', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                const SizedBox(width: 8),
-                Text('¥${formatYen(bank)}',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.trending_up, color: Colors.orange, size: 16),
-                const SizedBox(width: 4),
-                const Text('証券', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                const SizedBox(width: 8),
-                Text('¥${formatYen(stocks)}',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FundsSection extends StatelessWidget {
-  const _FundsSection();
-
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('準備資金', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            const Text('子どもたちが購入申請したときに必要な金額',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('子どもの総資産', style: TextStyle(fontSize: 14)),
-                Text('¥${formatYen(state.totalAssets)}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const Divider(height: 20),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('不足額', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                Text('¥0',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4CAF50))),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
