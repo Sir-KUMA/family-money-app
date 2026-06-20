@@ -20,6 +20,7 @@ class MoneyScreen extends StatelessWidget {
         child: Column(
           children: [
             _BankCard(
+                childId: childId,
                 balance: child.bankBalance,
                 annualInterestPercent: state.bankAnnualInterestPercent),
             const SizedBox(height: 16),
@@ -36,9 +37,10 @@ class MoneyScreen extends StatelessWidget {
 }
 
 class _BankCard extends StatelessWidget {
+  final String childId;
   final int balance;
   final double annualInterestPercent;
-  const _BankCard({required this.balance, required this.annualInterestPercent});
+  const _BankCard({required this.childId, required this.balance, required this.annualInterestPercent});
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +91,158 @@ class _BankCard extends StatelessWidget {
                     style: const TextStyle(fontSize: 13, color: Color(0xFF4CAF50))),
               ],
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (_) => _WithdrawalDialog(childId: childId),
+                ),
+                icon: const Icon(Icons.savings_outlined, size: 18),
+                label: const Text('引き出し申請'),
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.blue),
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WithdrawalDialog extends StatefulWidget {
+  final String childId;
+  const _WithdrawalDialog({required this.childId});
+
+  @override
+  State<_WithdrawalDialog> createState() => _WithdrawalDialogState();
+}
+
+class _WithdrawalDialogState extends State<_WithdrawalDialog> {
+  final _amountController = TextEditingController();
+  WithdrawalType _type = WithdrawalType.cash;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final amount = int.tryParse(_amountController.text.replaceAll(',', ''));
+    if (amount == null || amount <= 0) return;
+    final state = context.read<AppState>();
+    final child = state.childById(widget.childId);
+    if (child.bankBalance < amount) return;
+    state.requestWithdrawal(child, amount, _type);
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('引き出し申請を送りました')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final child = state.childById(widget.childId);
+    final amount = int.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
+    final canSubmit = amount > 0 && child.bankBalance >= amount;
+
+    return AlertDialog(
+      title: const Text('引き出し申請'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('銀行残高: ¥${formatYen(child.bankBalance)}',
+              style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _amountController,
+            decoration: const InputDecoration(
+              labelText: '引き出す金額（円）',
+              hintText: '例: 1,000',
+            ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorFormatter()],
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 16),
+          const Text('種類', style: TextStyle(fontSize: 13, color: Colors.grey)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _TypeChip(
+                  label: '💴 現金',
+                  selected: _type == WithdrawalType.cash,
+                  onTap: () => setState(() => _type = WithdrawalType.cash),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _TypeChip(
+                  label: '📱 電子マネー',
+                  selected: _type == WithdrawalType.electronic,
+                  onTap: () => setState(() => _type = WithdrawalType.electronic),
+                ),
+              ),
+            ],
+          ),
+          if (amount > 0 && child.bankBalance < amount) ...[
+            const SizedBox(height: 8),
+            const Text('残高が不足しています',
+                style: TextStyle(fontSize: 12, color: Colors.red)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
+        ),
+        ElevatedButton(
+          onPressed: canSubmit ? _submit : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('申請する'),
+        ),
+      ],
+    );
+  }
+}
+
+class _TypeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _TypeChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? Colors.blue.shade50 : Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? Colors.blue : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Center(
+          child: Text(label,
+              style: TextStyle(
+                fontSize: 13,
+                color: selected ? Colors.blue : Colors.grey,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              )),
         ),
       ),
     );

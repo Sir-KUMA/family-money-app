@@ -61,6 +61,8 @@ class _ApprovalPage extends StatelessWidget {
         children: [
           _ApprovalSection(),
           SizedBox(height: 24),
+          _WithdrawalApprovalSection(),
+          SizedBox(height: 24),
           _PurchaseRequestSection(),
         ],
       ),
@@ -471,6 +473,135 @@ class _JobApprovalCard extends StatelessWidget {
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('承認 ✓'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 引き出し承認セクション ────────────────────────────────────
+
+class _WithdrawalApprovalSection extends StatelessWidget {
+  const _WithdrawalApprovalSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final pendingAll = [
+      for (final child in state.children)
+        for (final req in child.pendingWithdrawals) (child: child, req: req),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('引き出し申請',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 8),
+            if (pendingAll.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.circular(12)),
+                child: Text('${pendingAll.length}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (pendingAll.isEmpty)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('引き出し申請はありません',
+                  style: TextStyle(color: Colors.grey)),
+            ),
+          )
+        else
+          ...pendingAll.map((r) =>
+              _WithdrawalApprovalCard(child: r.child, req: r.req)),
+      ],
+    );
+  }
+}
+
+class _WithdrawalApprovalCard extends StatelessWidget {
+  final Child child;
+  final WithdrawalRequest req;
+  const _WithdrawalApprovalCard({required this.child, required this.req});
+
+  @override
+  Widget build(BuildContext context) {
+    final canApprove = child.bankBalance >= req.amount;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(child.name,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF4CAF50))),
+                ),
+                const SizedBox(width: 8),
+                Text(req.type == WithdrawalType.cash ? '💴 現金' : '📱 電子マネー',
+                    style: const TextStyle(fontSize: 13)),
+                const Spacer(),
+                Text('¥${formatYen(req.amount)}',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            if (!canApprove) ...[
+              const SizedBox(height: 8),
+              const Text('残高不足のため承認できません',
+                  style: TextStyle(fontSize: 12, color: Colors.red)),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        context.read<AppState>().rejectWithdrawal(child, req),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                    child: const Text('却下'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: canApprove
+                        ? () => context
+                            .read<AppState>()
+                            .approveWithdrawal(child, req)
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('承認'),
                   ),
                 ),
               ],

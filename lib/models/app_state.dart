@@ -165,6 +165,45 @@ class AssetSnapshot {
       );
 }
 
+enum WithdrawalType { cash, electronic }
+enum WithdrawalStatus { pending, approved, rejected }
+
+class WithdrawalRequest {
+  final String id;
+  final int amount;
+  final WithdrawalType type;
+  WithdrawalStatus status;
+  final DateTime requestedAt;
+
+  WithdrawalRequest({
+    required this.id,
+    required this.amount,
+    required this.type,
+    required this.status,
+    required this.requestedAt,
+  });
+
+  String get typeLabel => type == WithdrawalType.cash ? '現金' : '電子マネー';
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'amount': amount,
+        'type': type.name,
+        'status': status.name,
+        'requestedAt': requestedAt.toIso8601String(),
+      };
+
+  factory WithdrawalRequest.fromJson(Map<String, dynamic> json) =>
+      WithdrawalRequest(
+        id: json['id'] as String,
+        amount: json['amount'] as int,
+        type: WithdrawalType.values.firstWhere((t) => t.name == json['type']),
+        status: WithdrawalStatus.values
+            .firstWhere((s) => s.name == json['status']),
+        requestedAt: DateTime.parse(json['requestedAt'] as String),
+      );
+}
+
 class BucketItem {
   final String id;
   final String name;
@@ -195,6 +234,7 @@ class Child {
   final Set<String> requestedItemIds;
   final Set<String> purchasedItemIds;
   List<AssetSnapshot> assetHistory;
+  List<WithdrawalRequest> withdrawalRequests;
 
   Child({
     required this.id,
@@ -208,10 +248,15 @@ class Child {
     Set<String>? requestedItemIds,
     Set<String>? purchasedItemIds,
     List<AssetSnapshot>? assetHistory,
+    List<WithdrawalRequest>? withdrawalRequests,
   })  : fundPositions = fundPositions ?? [],
         requestedItemIds = requestedItemIds ?? {},
         purchasedItemIds = purchasedItemIds ?? {},
-        assetHistory = assetHistory ?? [];
+        assetHistory = assetHistory ?? [],
+        withdrawalRequests = withdrawalRequests ?? [];
+
+  List<WithdrawalRequest> get pendingWithdrawals =>
+      withdrawalRequests.where((r) => r.status == WithdrawalStatus.pending).toList();
 
   int get stocksValue => stocks.fold(0, (sum, s) => sum + s.current);
   int get fundsValue => fundPositions.fold(0, (sum, p) => sum + p.current);
@@ -240,6 +285,7 @@ class Child {
         'requestedItemIds': requestedItemIds.toList(),
         'purchasedItemIds': purchasedItemIds.toList(),
         'assetHistory': assetHistory.map((s) => s.toJson()).toList(),
+        'withdrawalRequests': withdrawalRequests.map((r) => r.toJson()).toList(),
       };
 
   factory Child.fromJson(Map<String, dynamic> json) => Child(
@@ -265,6 +311,9 @@ class Child {
             Set<String>.from((json['purchasedItemIds'] as List? ?? []).cast<String>()),
         assetHistory: (json['assetHistory'] as List? ?? [])
             .map((e) => AssetSnapshot.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        withdrawalRequests: (json['withdrawalRequests'] as List? ?? [])
+            .map((e) => WithdrawalRequest.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 
@@ -409,6 +458,36 @@ class AppState extends ChangeNotifier {
       child.fundPositions[idx].invested += amount;
       child.fundPositions[idx].current += amount;
     }
+    notifyListeners();
+    _save();
+  }
+
+  // ── 引き出し申請 ─────────────────────────────────────────────
+
+  void requestWithdrawal(Child child, int amount, WithdrawalType type) {
+    if (amount <= 0 || child.bankBalance < amount) return;
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    child.withdrawalRequests.add(WithdrawalRequest(
+      id: id,
+      amount: amount,
+      type: type,
+      status: WithdrawalStatus.pending,
+      requestedAt: DateTime.now(),
+    ));
+    notifyListeners();
+    _save();
+  }
+
+  void approveWithdrawal(Child child, WithdrawalRequest req) {
+    if (child.bankBalance < req.amount) return;
+    req.status = WithdrawalStatus.approved;
+    child.bankBalance -= req.amount;
+    notifyListeners();
+    _save();
+  }
+
+  void rejectWithdrawal(Child child, WithdrawalRequest req) {
+    req.status = WithdrawalStatus.rejected;
     notifyListeners();
     _save();
   }
