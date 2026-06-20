@@ -277,8 +277,57 @@ class _PurchaseRequestCard extends StatelessWidget {
 
 // ── 月次更新セクション ────────────────────────────────────────
 
-class _MonthlyUpdateSection extends StatelessWidget {
+class _MonthlyUpdateSection extends StatefulWidget {
   const _MonthlyUpdateSection();
+
+  @override
+  State<_MonthlyUpdateSection> createState() => _MonthlyUpdateSectionState();
+}
+
+class _MonthlyUpdateSectionState extends State<_MonthlyUpdateSection> {
+  final _controllers = {
+    'sp500': TextEditingController(),
+    'nasdaq100': TextEditingController(),
+    'nikkei225': TextEditingController(),
+    'topix': TextEditingController(),
+  };
+
+  static const _labels = {
+    'sp500': 'S&P500',
+    'nasdaq100': 'NASDAQ100',
+    'nikkei225': '日経225',
+    'topix': 'TOPIX',
+  };
+
+  static const _urls = {
+    'sp500': 'https://www.google.com/finance/quote/.INX:INDEXSP?hl=ja',
+    'nasdaq100': 'https://www.google.com/finance/quote/NDX:INDEXNASDAQ?hl=ja',
+    'nikkei225': 'https://www.google.com/finance/quote/NI225:INDEXNIKKEI?hl=ja',
+    'topix': 'https://www.google.com/finance/quote/TOPIX:INDEXJPX?hl=ja',
+  };
+
+  @override
+  void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _apply() {
+    final returns = <String, double>{};
+    for (final entry in _controllers.entries) {
+      final val = double.tryParse(entry.value.text.trim());
+      if (val != null) returns[entry.key] = val / 100;
+    }
+    context.read<AppState>().applyMonthlyReturns(returns);
+    for (final c in _controllers.values) {
+      c.clear();
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('月次更新を実行しました')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -290,54 +339,98 @@ class _MonthlyUpdateSection extends StatelessWidget {
       children: [
         const Text('月次更新', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
+
+        // 銀行年利カード
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('銀行年利', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text('${state.bankAnnualInterestPercent.toStringAsFixed(1)}%',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue)),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => _InterestRateDialog(current: state.bankAnnualInterestPercent),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('変更'),
+                    ),
+                    const Spacer(),
+                    Text('今月の利息（予定）: +¥${formatYen(interest)}',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        // 指数騰落率カード
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('銀行年利', style: TextStyle(fontSize: 14)),
-                    Row(
-                      children: [
-                        Text('${state.bankAnnualInterestPercent.toStringAsFixed(1)}%',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: () => showDialog(
-                            context: context,
-                            builder: (_) => _InterestRateDialog(
-                              current: state.bankAnnualInterestPercent,
+                const Text('指数騰落率', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text('「1M」を選ぶと月次騰落率が確認できます',
+                    style: TextStyle(fontSize: 11, color: Colors.blue)),
+                const SizedBox(height: 12),
+                ..._labels.entries.map((entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 90,
+                            child: Text(entry.value,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: _controllers[entry.key],
+                              decoration: const InputDecoration(
+                                suffixText: '%',
+                                hintText: '0.0',
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                border: OutlineInputBorder(),
+                              ),
+                              keyboardType: const TextInputType.numberWithOptions(
+                                  signed: true, decimal: true),
                             ),
                           ),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          IconButton(
+                            icon: const Icon(Icons.open_in_new, size: 18),
+                            tooltip: '${entry.value}を調べる',
+                            color: Colors.blue,
+                            onPressed: () async {
+                              final url = Uri.parse(_urls[entry.key]!);
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(url, mode: LaunchMode.externalApplication);
+                              }
+                            },
                           ),
-                          child: const Text('変更'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const Divider(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('今月の利息（予定）: +¥${formatYen(interest)}',
-                        style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                        ],
+                      ),
+                    )),
+                const SizedBox(height: 4),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => showDialog(
-                      context: context,
-                      builder: (_) => const _MonthlyUpdateDialog(),
-                    ),
+                    onPressed: _apply,
                     icon: const Icon(Icons.update),
                     label: const Text('月次更新を実行'),
                     style: ElevatedButton.styleFrom(
@@ -402,124 +495,6 @@ class _InterestRateDialogState extends State<_InterestRateDialog> {
             foregroundColor: Colors.white,
           ),
           child: const Text('設定'),
-        ),
-      ],
-    );
-  }
-}
-
-class _MonthlyUpdateDialog extends StatefulWidget {
-  const _MonthlyUpdateDialog();
-
-  @override
-  State<_MonthlyUpdateDialog> createState() => _MonthlyUpdateDialogState();
-}
-
-class _MonthlyUpdateDialogState extends State<_MonthlyUpdateDialog> {
-  final _controllers = {
-    'sp500': TextEditingController(),
-    'nasdaq100': TextEditingController(),
-    'nikkei225': TextEditingController(),
-    'topix': TextEditingController(),
-  };
-
-  static const _labels = {
-    'sp500': 'S&P500',
-    'nasdaq100': 'NASDAQ100',
-    'nikkei225': '日経225',
-    'topix': 'TOPIX',
-  };
-
-  static const _urls = {
-    'sp500': 'https://www.google.com/finance/quote/.INX:INDEXSP?hl=ja',
-    'nasdaq100': 'https://www.google.com/finance/quote/NDX:INDEXNASDAQ?hl=ja',
-    'nikkei225': 'https://www.google.com/finance/quote/NI225:INDEXNIKKEI?hl=ja',
-    'topix': 'https://www.google.com/finance/quote/TOPIX:INDEXJPX?hl=ja',
-  };
-
-  @override
-  void dispose() {
-    for (final c in _controllers.values) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  void _apply() {
-    final returns = <String, double>{};
-    for (final entry in _controllers.entries) {
-      final val = double.tryParse(entry.value.text.replaceAll('%', '').trim());
-      if (val != null) returns[entry.key] = val / 100;
-    }
-    context.read<AppState>().applyMonthlyReturns(returns);
-    Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('月次更新'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('今月の指数リターンを入力してください',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
-            const Text('例: +2.3 または -1.5',
-                style: TextStyle(fontSize: 11, color: Colors.grey)),
-            const Text('🔗 右のボタンでGoogle Financeを開き、「1M」を選ぶと月次騰落率が確認できます',
-                style: TextStyle(fontSize: 11, color: Colors.blue)),
-            const SizedBox(height: 12),
-            ..._labels.entries.map((entry) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _controllers[entry.key],
-                          decoration: InputDecoration(
-                            labelText: entry.value,
-                            suffixText: '%',
-                            hintText: '0.0',
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                              signed: true, decimal: true),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.open_in_new, size: 18),
-                        tooltip: '${entry.value}を調べる',
-                        color: Colors.blue,
-                        onPressed: () async {
-                          final url = Uri.parse(_urls[entry.key]!);
-                          if (await canLaunchUrl(url)) {
-                            await launchUrl(url, mode: LaunchMode.externalApplication);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                )),
-            const Divider(),
-            const Text('銀行利息も自動で加算されます',
-                style: TextStyle(fontSize: 11, color: Colors.grey)),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('キャンセル'),
-        ),
-        ElevatedButton(
-          onPressed: _apply,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1565C0),
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('適用'),
         ),
       ],
     );
